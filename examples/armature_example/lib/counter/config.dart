@@ -34,7 +34,7 @@ final counterFeature =
       )
       // FAB only when Counter tab is active — demonstrates conditional null.
       ..useMultiSlot(layoutFeature.ports.fabSlot, (_, api) {
-        final activeTab = api.from(layoutFeature).activeTab.state;
+        final activeTab = api.of(layoutFeature).activeTab.state;
         if (activeTab != 'counter') return null;
         return FloatingActionButton(
           heroTag: 'counter_fab',

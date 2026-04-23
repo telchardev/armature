@@ -39,7 +39,7 @@ class AdminTab extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => counter.reset(),
                 icon: const Icon(Icons.restart_alt),
-                label: const Text('Reset Counter via api.from()'),
+                label: const Text('Reset Counter via api.of()'),
               ),
             ],
           ),

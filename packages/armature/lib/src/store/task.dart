@@ -4,7 +4,7 @@ import 'dart:collection';
 import 'package:meta/meta.dart' show internal;
 
 import '../errors.dart' show TaskError;
-import './state.dart' show State;
+import './state.dart' show State, StateChangeListener, StateListenerDisposer;
 
 /// Async function executed by a [Task].
 typedef TaskFn<TParams, TResult, TError> =
@@ -208,14 +208,34 @@ final class TaskFailed<TParams, TResult, TError>
 /// (supersede + share latest), `.debounce(d)` (coalesce burst),
 /// `.throttle(d)` (rate-limit, leading or trailing edge).
 ///
-/// The observable [state] field transitions through [TaskState]
-/// variants so UI can render loaders, errors, and results without
-/// ad-hoc boolean flags. `Task.state` is a full [State] — reading
-/// inside a reactive scope auto-subscribes the reaction.
+/// The observable [state] transitions through [TaskState] variants so
+/// UI can render loaders, errors, and results without ad-hoc boolean
+/// flags. Reading [state] inside a reactive scope auto-subscribes the
+/// enclosing reaction; use [subscribe] for imperative listeners.
 class Task<TParams, TResult, TError> {
-  final State<TaskState<TParams, TResult, TError>> state = State(
+  final State<TaskState<TParams, TResult, TError>> _state = State(
     state: TaskIdle<TParams, TResult, TError>(),
   );
+
+  /// Current snapshot of the task's lifecycle state.
+  ///
+  /// Reading inside a reaction-tracked scope (a `StateObserver` body,
+  /// a `Reaction.track` block) auto-subscribes the enclosing reaction
+  /// so any transition triggers a re-run. Reads outside a tracked scope
+  /// are plain snapshots.
+  TaskState<TParams, TResult, TError> get state => _state.state;
+
+  /// Registers [listener] for imperative observation of state
+  /// transitions. Returns a disposer that detaches the listener.
+  ///
+  /// Semantics mirror [State.subscribe]: synchronous dispatch on every
+  /// transition where the new value differs from the previous one;
+  /// silent no-op after [dispose]. Pass `fireImmediately: true` to seed
+  /// the listener with the current value on subscribe.
+  StateListenerDisposer subscribe(
+    StateChangeListener<TaskState<TParams, TResult, TError>> listener, {
+    bool fireImmediately = false,
+  }) => _state.subscribe(listener, fireImmediately: fireImmediately);
 
   final Queue<Future<TResult>> _callQueue = Queue();
 
@@ -288,7 +308,7 @@ class Task<TParams, TResult, TError> {
     _throttleLastFuture = null;
     _callQueue.clear();
 
-    state.dispose();
+    _state.dispose();
   }
 
   /// Invokes the task's underlying async function with [params],
@@ -321,7 +341,7 @@ class Task<TParams, TResult, TError> {
   Future<TResult> _callOnce(TParams params) {
     if (_called) {
       return Future.value(
-        (state.state as TaskDone<TParams, TResult, TError>).result,
+        (_state.state as TaskDone<TParams, TResult, TError>).result,
       );
     }
     if (_callQueue.isNotEmpty) {
@@ -367,7 +387,7 @@ class Task<TParams, TResult, TError> {
   /// so the caller waits for the latest run instead.
   Future<void> _runLatest(TParams params, int runId) async {
     if (runId == _latestRunId) {
-      state.state = TaskPending<TParams, TResult, TError>(params);
+      _state.state = TaskPending<TParams, TResult, TError>(params);
     }
 
     final fnFuture = Future<TResult>.sync(() => _fn(params));
@@ -375,14 +395,14 @@ class Task<TParams, TResult, TError> {
     try {
       final result = await fnFuture;
       if (runId != _latestRunId) return;
-      state.state = TaskDone<TParams, TResult, TError>(result);
+      _state.state = TaskDone<TParams, TResult, TError>(result);
       _flushLatestPending(result: result);
     } on Object catch (error, stackTrace) {
       if (runId != _latestRunId) return;
       if (error is TError) {
-        state.state = TaskFailed<TParams, TResult, TError>(error as TError);
-      } else if (state.state is TaskPending<TParams, TResult, TError>) {
-        state.state = TaskIdle<TParams, TResult, TError>();
+        _state.state = TaskFailed<TParams, TResult, TError>(error as TError);
+      } else if (_state.state is TaskPending<TParams, TResult, TError>) {
+        _state.state = TaskIdle<TParams, TResult, TError>();
       }
       _flushLatestPending(error: error, stackTrace: stackTrace);
     }
@@ -411,7 +431,7 @@ class Task<TParams, TResult, TError> {
     _debounceCompleter ??= Completer<TResult>();
     _debounceTimer?.cancel();
     _debounceTimer = Timer(duration, _fireDebounced);
-    state.state = TaskPending<TParams, TResult, TError>(params);
+    _state.state = TaskPending<TParams, TResult, TError>(params);
     return _debounceCompleter!.future;
   }
 
@@ -478,7 +498,7 @@ class Task<TParams, TResult, TError> {
     _throttleTrailingHasParams = true;
     _throttleTrailingCompleter ??= Completer<TResult>();
     _throttleTrailingWindow ??= Timer(duration, _fireThrottleTrailing);
-    state.state = TaskPending<TParams, TResult, TError>(params);
+    _state.state = TaskPending<TParams, TResult, TError>(params);
     return _throttleTrailingCompleter!.future;
   }
 
@@ -513,12 +533,12 @@ class Task<TParams, TResult, TError> {
     final fnFuture = Future<TResult>.sync(() => _fn(params));
 
     try {
-      state.state = TaskPending<TParams, TResult, TError>(params);
+      _state.state = TaskPending<TParams, TResult, TError>(params);
       _callQueue.add(fnFuture);
 
       final result = await fnFuture;
 
-      state.state = TaskDone<TParams, TResult, TError>(result);
+      _state.state = TaskDone<TParams, TResult, TError>(result);
       _called = true;
       return result;
     } on Object catch (error) {
@@ -526,7 +546,7 @@ class Task<TParams, TResult, TError> {
         // The `is TError` check guarantees the cast; the compiler
         // cannot promote through a generic type parameter, hence the
         // explicit `as`.
-        state.state = TaskFailed<TParams, TResult, TError>(error as TError);
+        _state.state = TaskFailed<TParams, TResult, TError>(error as TError);
       }
       rethrow;
     } finally {
@@ -535,8 +555,8 @@ class Task<TParams, TResult, TError> {
       // If neither TaskDone nor TaskFailed landed (non-TError throw),
       // revert to TaskIdle so observers don't see a stale TaskPending.
       if (_callQueue.isEmpty &&
-          state.state is TaskPending<TParams, TResult, TError>) {
-        state.state = TaskIdle<TParams, TResult, TError>();
+          _state.state is TaskPending<TParams, TResult, TError>) {
+        _state.state = TaskIdle<TParams, TResult, TError>();
       }
     }
   }

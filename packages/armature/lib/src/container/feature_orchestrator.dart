@@ -43,7 +43,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   final List<AnyFeature> _features;
 
   /// Populated on first successful [start] and cleared by the
-  /// polished-rollback teardown path (`resetForRestart: true`).
+  /// polished-rollback teardown path (`forRestart: true`).
   /// Accessing before then throws via [graph]; [statusOf] degrades to
   /// `FeatureStatus.disabled` gracefully.
   Graph<AnyFeature>? _graph;
@@ -134,19 +134,28 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   void _runConstructPhase(Graph<AnyFeature> g) {
     for (final f in g.topologicalOrder()) {
       if (host.isDisposed) return;
+      // Re-apply any `..usePipe(...)` / `..useBehavior(...)` / slot
+      // bindings that were cleared by a previous container's teardown.
+      // No-op on the first `start()` of this feature instance — the
+      // bindings are already live from the class-level cascade.
+      f.internal.ensureHandlersRegistered(f);
       f.internal.construct();
     }
   }
 
   /// Teardown: deactivate all active features (graph handles ordering,
   /// awaiting per-feature `onDeactivate`), then have each feature
-  /// dispose its own lifetime resources sequentially. No-op if the
-  /// graph was never built (container disposed before first [start]).
+  /// restore its internal state to the freshly-constructed baseline so
+  /// the same top-level feature instance can be reused in a future
+  /// `AppContainer`. No-op if the graph was never built (container
+  /// disposed before first [start]).
   ///
-  /// When [resetForRestart] is true, also resets each feature's
-  /// internal state and discards the graph so a subsequent [start] can
-  /// rebuild from scratch. Used by the polished-rollback path.
-  Future<void> teardown({bool resetForRestart = false}) async {
+  /// Always drops the cached graph at the end — the next [start] (if
+  /// the container is still alive, i.e. a rollback path) rebuilds it
+  /// and re-wires `toggle` / `lifetimeCleanup` for every feature. For
+  /// full container dispose the graph is orphaned regardless, so
+  /// clearing the field is a harmless memory-hygiene step.
+  Future<void> teardown() async {
     final g = _graph;
     if (g == null) return;
     await g.shutdown();
@@ -162,16 +171,8 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
           ),
         ),
       );
-
-      if (resetForRestart) {
-        f.internal.resetForRestart();
-      }
     }
-    if (resetForRestart) {
-      // Drop the graph so the next start rebuilds it (and re-wires
-      // toggle + lifetimeCleanup for every feature).
-      _graph = null;
-    }
+    _graph = null;
   }
 
   // === GraphVisitor<AnyFeature> ===

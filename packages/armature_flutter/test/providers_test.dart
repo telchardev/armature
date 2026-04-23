@@ -54,7 +54,7 @@ void main() {
       final childFeature =
           createFeature(name: "child", dependsOn: [rootFeature])
             ..usePipe(pipe, (value, api) {
-              return value + api.from(rootFeature).counter.state;
+              return value + api.of(rootFeature).counter.state;
             });
 
       final container = await startedContainer(
@@ -206,7 +206,7 @@ void main() {
       final childFeature =
           createFeature(name: "child", dependsOn: [rootFeature])
             ..useSingleSlot(slot, (_, api) {
-              return Text('count: ${api.from(rootFeature).counter.state}');
+              return Text('count: ${api.of(rootFeature).counter.state}');
             });
 
       final container = await startedContainer(

@@ -1,5 +1,10 @@
 # armature
 
+[![pub package](https://img.shields.io/pub/v/armature.svg)](https://pub.dev/packages/armature)
+[![likes](https://img.shields.io/pub/likes/armature?logo=dart)](https://pub.dev/packages/armature/score)
+[![points](https://img.shields.io/pub/points/armature?logo=dart)](https://pub.dev/packages/armature/score)
+[![CI](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml/badge.svg?branch=main)](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml)
+
 Feature-based application framework with dependency-graph resolution,
 reactive stores, typed ports (`Pipe` / `Behavior` / slots), and tasks.
 **Pure Dart**; pair with
@@ -15,8 +20,8 @@ dependencies, eager store construction, and extension points
 
 ```yaml
 dependencies:
-  armature: ^0.1.0
-  armature_flutter: ^0.1.0   # if you want the Flutter integration
+  armature: ^0.2.0
+  armature_flutter: ^0.2.0   # if you want the Flutter integration
 ```
 
 ## Quickstart
@@ -50,7 +55,7 @@ final authFeature = createFeature(
 final adminFeature = createFeature(
   name: "Admin",
   dependsOn: [authFeature],        // required parent
-  optionalDependsOn: [counterFeature], // optional — reachable via `api.from`
+  optionalDependsOn: [counterFeature], // optional — reachable via `api.of`
 );
 ```
 
@@ -60,7 +65,7 @@ final adminFeature = createFeature(
 adminFeature
   ..activation(whenActive(authFeature))
   ..onStart((api, cleanup) async {
-    final auth = api.from(authFeature).auth;
+    final auth = api.of(authFeature).auth;
     cleanup.add(auth.subscribe((_, state) {
       if (state.user?.name == 'admin') {
         api.own.someStore.doWork();

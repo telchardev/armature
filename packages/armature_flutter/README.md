@@ -1,5 +1,10 @@
 # armature_flutter
 
+[![pub package](https://img.shields.io/pub/v/armature_flutter.svg)](https://pub.dev/packages/armature_flutter)
+[![likes](https://img.shields.io/pub/likes/armature_flutter?logo=dart)](https://pub.dev/packages/armature_flutter/score)
+[![points](https://img.shields.io/pub/points/armature_flutter?logo=dart)](https://pub.dev/packages/armature_flutter/score)
+[![CI](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml/badge.svg?branch=main)](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml)
+
 Flutter integration for [`armature`](https://pub.dev/packages/armature) —
 app bootstrap, slot widgets, reactive providers, and an interactive
 feature-graph debug overlay.
@@ -8,8 +13,8 @@ feature-graph debug overlay.
 
 ```yaml
 dependencies:
-  armature: ^0.1.0
-  armature_flutter: ^0.1.0
+  armature: ^0.2.0
+  armature_flutter: ^0.2.0
 ```
 
 ## Quickstart

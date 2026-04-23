@@ -1,0 +1,11 @@
+{
+  "name": "Armature",
+  "short_name": "Armature",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#4F46E5",
+  "description": "Feature-based Flutter framework.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}

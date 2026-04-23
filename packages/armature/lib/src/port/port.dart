@@ -168,6 +168,15 @@ abstract class Port<
     _handlers.remove(feature);
   }
 
+  /// Framework-internal probe used by the feature-orchestrator's re-
+  /// registration path. Returns `true` when [feature] has a handler
+  /// currently registered on this port, and `false` otherwise —
+  /// including the window after [removeHandler] has run during a
+  /// previous container's teardown but before the next container's
+  /// construct phase has re-applied the feature's bindings.
+  @internal
+  bool hasHandlerFor(AnyFeature feature) => _handlers[feature] != null;
+
   /// Pure validator — returns the [PortError] that would be raised for
   /// [feature] against [candidateOwner], or `null` if the pairing is
   /// legal. Used by [addHandler] (eager path: wraps the result in a

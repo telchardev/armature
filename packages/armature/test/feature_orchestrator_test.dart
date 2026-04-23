@@ -37,18 +37,21 @@ void main() {
       },
     );
 
-    test('toggle(ToggleState.active) during setup activates the feature', () async {
-      final feature = createFeature(name: "immediate")
-        ..activation((_, toggle, _) {
-          unawaited(toggle(ToggleState.active));
-        });
+    test(
+      'toggle(ToggleState.active) during setup activates the feature',
+      () async {
+        final feature = createFeature(name: "immediate")
+          ..activation((_, toggle, _) {
+            unawaited(toggle(ToggleState.active));
+          });
 
-      final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
-      await container.start();
+        final container = AppContainer(features: [feature]);
+        addTearDown(container.dispose);
+        await container.start();
 
-      expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
-    });
+        expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
+      },
+    );
 
     test(
       'container.toggleFeature after start drives activation externally',

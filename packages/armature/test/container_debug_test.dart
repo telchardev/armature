@@ -35,7 +35,7 @@ void main() {
 
     test('debug throws ContainerUsageError after dispose', () async {
       // After dispose, the internal graph reference is kept (only
-      // `resetForRestart: true` drops it), so we need an explicit guard
+      // `forRestart: true` drops it), so we need an explicit guard
       // — otherwise `debug` would return a stale snapshot of a torn-down
       // container. This test pins the explicit-throw behaviour.
       final container = await startedContainer(

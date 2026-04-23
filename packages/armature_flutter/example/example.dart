@@ -17,7 +17,7 @@ import 'package:flutter/material.dart';
 /// - `StoreBuilder<T>` — reactive wrapper + typed DI.
 /// - `StoreSelector<V>` — equality-based derived rebuild.
 /// - `PipeProvider`, `SingleSlotProvider`, `MultiSlotProvider`.
-/// - activation helpers + `api.from(parent).store` cross-feature reads.
+/// - activation helpers + `api.of(parent).store` cross-feature reads.
 
 // ── Stores ──
 
@@ -98,7 +98,7 @@ final historyFeature =
       // tab / body / action silently disappear.
       ..activation(whenActive(counterFeature))
       ..onStart((api, cleanup) {
-        final counter = api.from(counterFeature).counter;
+        final counter = api.of(counterFeature).counter;
         cleanup.add(
           counter.subscribe((_, v) {
             if (v != 0) api.own.history.push(v);

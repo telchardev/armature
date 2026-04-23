@@ -29,7 +29,7 @@ void main() {
       final childFeature =
           createFeature(name: 'child', dependsOn: [rootFeature])
             ..usePipe(labelPipe, (value, api) {
-              return 'n=${api.from(rootFeature).counter.state}';
+              return 'n=${api.of(rootFeature).counter.state}';
             });
 
       final container = await startedContainer(
@@ -69,13 +69,10 @@ void main() {
 
       final childFeature =
           createFeature(name: 'child', dependsOn: [rootFeature])
-            ..usePipe(
-              aPipe,
-              (v, api) => v + api.from(rootFeature).counter.state,
-            )
+            ..usePipe(aPipe, (v, api) => v + api.of(rootFeature).counter.state)
             ..usePipe(
               bPipe,
-              (v, api) => v + api.from(rootFeature).counter.state * 10,
+              (v, api) => v + api.of(rootFeature).counter.state * 10,
             );
 
       final container = await startedContainer(
@@ -118,11 +115,11 @@ void main() {
             createFeature(name: 'child', dependsOn: [rootFeature])
               ..usePipe(
                 aPipe,
-                (v, api) => v + api.from(rootFeature).counter.state,
+                (v, api) => v + api.of(rootFeature).counter.state,
               )
               ..usePipe(
                 bPipe,
-                (v, api) => v + api.from(rootFeature).counter.state,
+                (v, api) => v + api.of(rootFeature).counter.state,
               );
 
         final container = await startedContainer(
@@ -203,7 +200,7 @@ void main() {
       final childFeature = createFeature(
         name: 'child',
         dependsOn: [rootFeature],
-      )..usePipe(pipe, (v, api) => v + api.from(rootFeature).counter.state);
+      )..usePipe(pipe, (v, api) => v + api.of(rootFeature).counter.state);
 
       final container = await startedContainer(
         features: [rootFeature, childFeature],

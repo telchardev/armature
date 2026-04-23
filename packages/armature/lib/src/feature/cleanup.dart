@@ -11,7 +11,7 @@ import 'package:meta/meta.dart';
 ///
 /// ```dart
 /// feature.onStart((api, cleanup) {
-///   final sub = api.from(other).store.subscribe(...);
+///   final sub = api.of(other).store.subscribe(...);
 ///   cleanup.add(sub);                  // sync disposer
 ///
 ///   final ws = WebSocket.connect(url);

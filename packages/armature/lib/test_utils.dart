@@ -41,7 +41,10 @@ ContainerOptions silentOptions({int? maxResolveConcurrency}) {
 
 /// Paired result from [collectErrors]: a [ContainerOptions] whose
 /// `errorHandler` appends every error into [errors].
-typedef ErrorCollector = ({ContainerOptions options, List<ArmatureError> errors});
+typedef ErrorCollector = ({
+  ContainerOptions options,
+  List<ArmatureError> errors,
+});
 
 /// Creates a pre-wired error collector.
 ///

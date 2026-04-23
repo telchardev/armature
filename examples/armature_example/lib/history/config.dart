@@ -16,7 +16,7 @@ final historyFeature =
       )
       // Cross-feature reactive: subscribe to Counter, push every value.
       ..onStart((api, cleanup) {
-        final counter = api.from(counterFeature).counter;
+        final counter = api.of(counterFeature).counter;
         final history = api.own.history;
         final dispose = counter.subscribe((_, s) => history.push(s.value));
         cleanup.add(dispose);

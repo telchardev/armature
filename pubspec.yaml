@@ -12,6 +12,7 @@ workspace:
   - packages/armature_flutter
   - examples/armature_example
   - shared/analyzer
+  - website
 
 dev_dependencies:
   melos: ^7.5.1
@@ -58,3 +59,30 @@ melos:
     test:
       run: melos exec --dir-exists=test -- "flutter test"
       description: Run all Flutter tests in this project.
+
+    publish:check:
+      run: melos publish --yes
+      description: Run publish check
+
+    release:unreleased:
+      run: |
+        tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$tag" ]; then
+          echo "No release tags yet — all commits are unreleased:"
+          git log --oneline
+        else
+          echo "Commits since $tag (these drive the next melos version bumps):"
+          git log "$tag..HEAD" --oneline
+        fi
+      description: |
+        List conventional commits since the last release tag — these are
+        what `melos version` will inspect to decide version bumps.
+        Melos has no `--dry-run`; this is the closest preview.
+
+    release:verify:
+      run: melos run analyze && melos run test && melos publish
+      description: |
+        Full pre-release gate — runs analyze + test + `melos publish`
+        (dry-run by default), the same sequence the release workflow
+        executes in CI. Fails if any package's analyze, tests, or
+        `dart pub publish --dry-run` would fail.

@@ -1,0 +1,45 @@
+# Lefthook configuration — git hooks manager.
+#
+# Install lefthook (one-time, per dev machine):
+#   macOS:       brew install lefthook
+#   Linux:       https://github.com/evilmartians/lefthook#install
+#
+# Enable the hooks for this clone (one-time, per checkout):
+#   lefthook install
+#
+# After that, `git commit` runs the commit-msg hook below; invalid
+# messages are rejected locally with a hint pointing at the rules in
+# commitlint.config.js. The authoritative check still runs server-side
+# via .github/workflows/commitlint.yml on every PR.
+
+commit-msg:
+  commands:
+    conventional-commits:
+      # {1} is the path to the commit message file passed by git.
+      run: |
+        msg_file="{1}"
+        first_line=$(head -n1 "$msg_file")
+
+        # Allow merge / revert / fixup / squash commits — they do not
+        # follow the user format.
+        case "$first_line" in
+          Merge*|"Revert \""*|fixup!*|squash!*) exit 0 ;;
+        esac
+
+        pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|release)(\([a-z0-9_,-]+\))?!?: .+'
+
+        if [[ ! "$first_line" =~ $pattern ]]; then
+          echo ""
+          echo "✖ Commit message does not follow Conventional Commits."
+          echo ""
+          echo "  Got:      $first_line"
+          echo "  Expected: <type>(<scope>): <subject>"
+          echo ""
+          echo "  Types:    feat, fix, docs, style, refactor, perf,"
+          echo "            test, build, ci, chore, revert, release"
+          echo "  Examples: feat(website): add interactive docs site"
+          echo "            refactor(armature)!: unwrap Task.state"
+          echo ""
+          echo "  Full rules: commitlint.config.js"
+          exit 1
+        fi

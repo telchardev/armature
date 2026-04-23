@@ -187,7 +187,7 @@ void main() {
       final childFeature =
           createFeature(name: "child", dependsOn: [rootFeature])
             ..useSingleSlot(slot, (data, api) {
-              final visible = api.from(rootFeature).toggle.state;
+              final visible = api.of(rootFeature).toggle.state;
               if (!visible) return null;
               return const Text("visible");
             });
@@ -340,7 +340,7 @@ void main() {
       final conditionalFeature =
           createFeature(name: "conditional", dependsOn: [rootFeature])
             ..useMultiSlot(slot, (data, api) {
-              final visible = api.from(rootFeature).toggle.state;
+              final visible = api.of(rootFeature).toggle.state;
               if (!visible) return null;
               return const Text("conditional");
             }, order: 2);

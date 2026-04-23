@@ -38,7 +38,7 @@ ActivationSetup manualActivation() {
 /// ```
 ///
 /// The [feature] must appear in the owning feature's `dependsOn` or
-/// `optionalDependsOn` list — `api.from(feature)` will throw
+/// `optionalDependsOn` list — `api.of(feature)` will throw
 /// `FeatureResolutionError` otherwise (standard parent-API contract).
 ActivationSetup whenStoreState<TExports, TState>({
   required Feature<dynamic, TExports, dynamic> feature,
@@ -50,9 +50,7 @@ ActivationSetup whenStoreState<TExports, TState>({
     cleanup.add(
       target.subscribe((_, state) {
         unawaited(
-          toggle(
-            predicate(state) ? ToggleState.active : ToggleState.inactive,
-          ),
+          toggle(predicate(state) ? ToggleState.active : ToggleState.inactive),
         );
       }, fireImmediately: true),
     );
@@ -144,12 +142,8 @@ ActivationSetup whenAllActive(List<AnyFeature> features) {
     }
     final stores = [for (final f in features) parentApi.statusOf(f)];
     void reevaluate() {
-      final allActive = stores.every(
-        (s) => s.state == FeatureStatus.active,
-      );
-      unawaited(
-        toggle(allActive ? ToggleState.active : ToggleState.inactive),
-      );
+      final allActive = stores.every((s) => s.state == FeatureStatus.active);
+      unawaited(toggle(allActive ? ToggleState.active : ToggleState.inactive));
     }
 
     for (final store in stores) {

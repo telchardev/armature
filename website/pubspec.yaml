@@ -1,0 +1,33 @@
+name: armature_website
+description: Interactive landing and documentation site for the Armature framework.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.19.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  go_router: ^14.6.2
+  url_launcher: ^6.3.1
+  web: ^1.1.0
+  flutter_highlighter: ^0.1.1
+  highlighter: ^0.1.1
+  google_fonts: ^8.0.2
+  armature:
+    path: ../packages/armature
+  armature_flutter:
+    path: ../packages/armature_flutter
+
+dev_dependencies:
+  shared_analyzer:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

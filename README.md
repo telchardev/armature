@@ -1,4 +1,8 @@
-![CI](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml/badge.svg?branch=main)
+[![pub package](https://img.shields.io/pub/v/armature.svg?label=armature)](https://pub.dev/packages/armature)
+[![pub package](https://img.shields.io/pub/v/armature_flutter.svg?label=armature_flutter)](https://pub.dev/packages/armature_flutter)
+[![likes](https://img.shields.io/pub/likes/armature?logo=dart)](https://pub.dev/packages/armature/score)
+[![points](https://img.shields.io/pub/points/armature?logo=dart)](https://pub.dev/packages/armature/score)
+[![CI](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml/badge.svg?branch=main)](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml)
 
 # armature
 
@@ -121,7 +125,7 @@ final authFeature = createFeature(
   exports: (api) => api.own,
 );
 
-// Optional dependencies stay reachable via `api.from(...)` even when
+// Optional dependencies stay reachable via `api.of(...)` even when
 // inactive — handy for features that merely *decorate* another.
 final adminFeature = createFeature(
   name: "Admin",
@@ -166,7 +170,7 @@ adminFeature
     }, fireImmediately: true));
   })
   ..onStart((api, cleanup) async {
-    final auth = api.from(authFeature).auth;
+    final auth = api.of(authFeature).auth;
     // Per-activation work — `cleanup` runs LIFO on deactivation.
     cleanup.add(auth.subscribe((_, s) => /* react */));
   });
@@ -214,8 +218,8 @@ Access stores from parent features via typed API:
 
 ```dart
 // In onStart or handler:
-final authStore = api.from(authFeature).auth;
-final activeTab = api.from(layoutFeature).activeTab;
+final authStore = api.of(authFeature).auth;
+final activeTab = api.of(layoutFeature).activeTab;
 ```
 
 Access stores from widgets — three tools, ordered from imperative to most granular:
@@ -520,9 +524,9 @@ See [`examples/armature_example/`](examples/armature_example/) — a synthetic *
 
 - **Layout** — root feature. Declares every port (`titleSlot`, `tabsPipe`, `bodySwitchSlot`, `actionsSlot`, `fabSlot`, `themeBehavior`) and owns `ActiveTabStore`. The shell wires them up with `BehaviorProvider` / `SingleSlotProvider` / `MultiSlotProvider` / `PipeProvider`.
 - **Counter** — `Store<CounterState>` with `createVoidTask` / `createTask(.queue)`. Contributes a FAB via `useMultiSlot` that returns `null` unless the Counter tab is active (conditional `null` pattern), plus an always-visible badge in the app bar.
-- **History** — depends on Counter. In `onStart`, calls `api.from(counterFeature).counter.subscribe(...)` to mirror every counter tick into its own list. Pure cross-feature reactive propagation.
+- **History** — depends on Counter. In `onStart`, calls `api.of(counterFeature).counter.subscribe(...)` to mirror every counter tick into its own list. Pure cross-feature reactive propagation.
 - **Auth** — repository injected into the stores factory (`SharedPrefsAuthRepository`); `createVoidTask(.once)` for `load()`, `createTask(.queue)` for `login()`. Overrides the `titleSlot` when logged in and adds a conditional logout action to `actionsSlot`.
-- **Admin** — **reactive** conditional ports (no `activation()`). `usePipe` / `useSingleSlot` handlers read `api.from(authFeature).auth.state` and re-evaluate when it changes; the tab appears the moment you log in as `admin` and disappears on logout. Uses `optionalDependsOn` for `authFeature` and `counterFeature` — both stay reachable via `api.from` regardless of activation.
+- **Admin** — **reactive** conditional ports (no `activation()`). `usePipe` / `useSingleSlot` handlers read `api.of(authFeature).auth.state` and re-evaluate when it changes; the tab appears the moment you log in as `admin` and disappears on logout. Uses `optionalDependsOn` for `authFeature` and `counterFeature` — both stay reachable via `api.of` regardless of activation.
 - **NightMode** — `useBehavior(priority: 10)` overrides the shell's `BehaviorProvider.initialValue` (light theme) when enabled. Persists via `SharedPreferences`. The action button adapts to `LayoutMode.phone` (icon only) vs `LayoutMode.tablet` (icon + label) — typed slot data in action.
 - **FeatureToggles** — runtime switches kept in a `Store`. Consumed by Inspector through the `whenStoreState` activation helper.
 - **Inspector** — `..activation(whenStoreState(feature: featureTogglesFeature, store: (e) => e.featureToggles, predicate: (s) => s.inspector))` — one-liner thanks to the activation helpers. Self-contained diagnostic view (build mode, platform, JIT/AOT, refresh counter).
@@ -556,10 +560,10 @@ No API keys, no network — everything is in-process except the two `SharedPrefe
 
 | Package | Version | Dart SDK | Description |
 |---------|---------|----------|-------------|
-| [`armature`](https://pub.dev/packages/armature) | 0.1.0 | `^3.11.0` | Core framework — features, stores, tasks, ports |
-| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.1.0 | `^3.11.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
-| [`armature_reactive`](https://pub.dev/packages/armature_reactive) | 0.1.0 | `^3.11.0` | Reactive primitives — `Atom`, `Reaction` |
-| [`armature_graph`](https://pub.dev/packages/armature_graph) | 0.1.0 | `^3.11.0` | DAG resolver — topological ordering, visitor |
+| [`armature`](https://pub.dev/packages/armature) | 0.1.0 | `^3.9.0` | Core framework — features, stores, tasks, ports |
+| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.1.0 | `^3.9.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
+| [`armature_reactive`](https://pub.dev/packages/armature_reactive) | 0.1.0 | `^3.9.0` | Reactive primitives — `Atom`, `Reaction` |
+| [`armature_graph`](https://pub.dev/packages/armature_graph) | 0.1.0 | `^3.9.0` | DAG resolver — topological ordering, visitor |
 
 ## License
 

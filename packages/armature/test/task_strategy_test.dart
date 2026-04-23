@@ -77,7 +77,7 @@ void main() {
 
       final results = await Future.wait([task(1), task(2), task(3)]);
       expect(results, equals([30, 30, 30]));
-      expect(task.state.state, equals(const TaskDone<int, int, Object>(30)));
+      expect(task.state, equals(const TaskDone<int, int, Object>(30)));
     });
 
     test(
@@ -92,15 +92,9 @@ void main() {
         );
 
         final f1 = task(1);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(1)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(1)));
         final f2 = task(2);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(2)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(2)));
 
         final r1 = await f1;
         final r2 = await f2;
@@ -146,7 +140,7 @@ void main() {
         caught = e;
       }
       expect(caught, isA<ArgumentError>());
-      expect(task.state.state, isA<TaskFailed<int, int, Object>>());
+      expect(task.state, isA<TaskFailed<int, int, Object>>());
     });
   });
 
@@ -170,7 +164,7 @@ void main() {
         final results = await Future.wait([f1, f2, f3]);
         expect(callCount, equals(1));
         expect(results, equals([3, 3, 3]));
-        expect(task.state.state, equals(const TaskDone<int, int, Object>(3)));
+        expect(task.state, equals(const TaskDone<int, int, Object>(3)));
       },
     );
 
@@ -183,21 +177,15 @@ void main() {
         );
 
         final f = task(1);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(1)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(1)));
 
         // A second call before the timer fires updates the pending params.
         final f2 = task(42);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(42)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(42)));
 
         await f;
         await f2;
-        expect(task.state.state, equals(const TaskDone<int, int, Object>(42)));
+        expect(task.state, equals(const TaskDone<int, int, Object>(42)));
       },
     );
 
@@ -249,7 +237,7 @@ void main() {
           caught = e;
         }
         expect(caught, isA<ArgumentError>());
-        expect(task.state.state, isA<TaskFailed<int, int, Object>>());
+        expect(task.state, isA<TaskFailed<int, int, Object>>());
       },
     );
   });
@@ -347,19 +335,13 @@ void main() {
         );
 
         final f = task(1);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(1)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(1)));
         final f2 = task(2);
-        expect(
-          task.state.state,
-          equals(const TaskPending<int, int, Object>(2)),
-        );
+        expect(task.state, equals(const TaskPending<int, int, Object>(2)));
 
         await f;
         await f2;
-        expect(task.state.state, equals(const TaskDone<int, int, Object>(2)));
+        expect(task.state, equals(const TaskDone<int, int, Object>(2)));
       },
     );
 
@@ -426,7 +408,7 @@ void main() {
           caught = e;
         }
         expect(caught, isA<ArgumentError>());
-        expect(task.state.state, isA<TaskFailed<int, int, Object>>());
+        expect(task.state, isA<TaskFailed<int, int, Object>>());
       },
     );
   });

@@ -85,7 +85,7 @@ final analyticsFeature =
       },
       exports: (api) => api.own,
     )..onStart((api, cleanup) {
-      final orders = api.from(ordersFeature).orders;
+      final orders = api.of(ordersFeature).orders;
       cleanup.add(
         orders.subscribe((prev, curr) {
           if (curr.length > prev.length) api.own.analytics.tick();
@@ -104,7 +104,7 @@ final auditFeature =
         optionalDependsOn: [ordersFeature],
       )
       ..onStart((api, cleanup) {
-        final orders = api.from(ordersFeature).orders;
+        final orders = api.of(ordersFeature).orders;
         cleanup.add(
           orders.subscribe((prev, curr) {
             if (curr.length > prev.length) {

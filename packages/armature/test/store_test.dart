@@ -227,7 +227,7 @@ void main() {
         }
 
         expect(
-          service.onceSuccessTask.state.state,
+          service.onceSuccessTask.state,
           isA<TaskDone<TaskParams, TaskResult, Object?>>(),
         );
 
@@ -242,7 +242,7 @@ void main() {
         await service.onceFailTask(const TaskParams(1));
       } on Object catch (error) {
         expect(error, isA<ArgumentError>());
-        final s = service.onceFailTask.state.state;
+        final s = service.onceFailTask.state;
         expect(s, isA<TaskFailed<TaskParams, TaskResult, Object?>>());
         expect(
           (s as TaskFailed<TaskParams, TaskResult, Object?>).error,
@@ -261,7 +261,7 @@ void main() {
         const params = TaskParams(1);
         final task = service.onceSuccessDelayedTask(params);
 
-        final pending = service.onceSuccessDelayedTask.state.state;
+        final pending = service.onceSuccessDelayedTask.state;
         expect(pending, isA<TaskPending<TaskParams, TaskResult, Object?>>());
         expect(
           (pending as TaskPending<TaskParams, TaskResult, Object?>).params,
@@ -272,7 +272,7 @@ void main() {
 
         // Successful completion transitions to TaskDone (not back to Idle).
         expect(
-          service.onceSuccessDelayedTask.state.state,
+          service.onceSuccessDelayedTask.state,
           isA<TaskDone<TaskParams, TaskResult, Object?>>(),
         );
       },
@@ -325,7 +325,7 @@ void main() {
         ) {
           expect(error, isA<ArgumentError>());
           expect(
-            service.queueFailTask.state.state,
+            service.queueFailTask.state,
             isA<TaskFailed<TaskParams, void, Object?>>(),
           );
         }),
@@ -410,7 +410,7 @@ void main() {
         // syncThrowTask declares TError=Object, so StateError matches
         // → terminal state is TaskFailed (not TaskPending).
         expect(
-          service.syncThrowTask.state.state,
+          service.syncThrowTask.state,
           isA<TaskFailed<int, int, Object>>(),
         );
 
@@ -423,7 +423,7 @@ void main() {
         }
         expect(second, isA<StateError>());
         expect(
-          service.syncThrowTask.state.state,
+          service.syncThrowTask.state,
           isA<TaskFailed<int, int, Object>>(),
         );
       },
@@ -463,17 +463,14 @@ void main() {
               TaskFailed(:final error) => 'failed($error)',
             };
 
-        expect(label(service.onceSuccessTask.state.state), equals('idle'));
+        expect(label(service.onceSuccessTask.state), equals('idle'));
 
         final params = const TaskParams(7);
         final future = service.onceSuccessTask(params);
-        expect(
-          label(service.onceSuccessTask.state.state),
-          equals('pending(7)'),
-        );
+        expect(label(service.onceSuccessTask.state), equals('pending(7)'));
 
         await future;
-        expect(label(service.onceSuccessTask.state.state), equals('done(7)'));
+        expect(label(service.onceSuccessTask.state), equals('done(7)'));
       },
     );
 

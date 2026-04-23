@@ -69,7 +69,7 @@ void main() {
       expect(feature.name, equals('WithExports'));
     });
 
-    test('api.from returns exports — passthrough mirrors stores', () async {
+    test('api.of returns exports — passthrough mirrors stores', () async {
       final parent = createFeature(
         name: 'parent',
         stores: (_) => (counter: _Counter()),
@@ -89,7 +89,7 @@ void main() {
       expect(seenFromChildFactory, equals(0));
     });
 
-    test('api.from returns narrowed exports when hiding fields', () async {
+    test('api.of returns narrowed exports when hiding fields', () async {
       final authFeature = createFeature(
         name: 'Auth',
         stores: (_) => (auth: _Auth()),
@@ -165,7 +165,7 @@ void main() {
 
     test('exports can hold plain values / references without stores', () async {
       // Stateless feature with no stores can legally go without exports.
-      // Its api.from(...) returns the inferred TExports (typically Null).
+      // Its api.of(...) returns the inferred TExports (typically Null).
       final stateless = createFeature(name: 'pure-extension');
       final container = await startedContainer(features: [stateless]);
       expect(container.statusOf(stateless), equals(FeatureStatus.active));

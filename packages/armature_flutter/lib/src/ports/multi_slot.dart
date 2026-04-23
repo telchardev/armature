@@ -105,10 +105,9 @@ class MultiSlot<
 
     if (entries.length > 1) {
       entries.sort(
-        (a, b) =>
-            orderDirection == MultiSlotOrderDirection.asc
-                ? a.order - b.order
-                : b.order - a.order,
+        (a, b) => orderDirection == MultiSlotOrderDirection.asc
+            ? a.order - b.order
+            : b.order - a.order,
       );
     }
 

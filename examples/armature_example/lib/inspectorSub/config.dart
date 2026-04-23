@@ -19,7 +19,7 @@ final inspectorSubFeature =
         return IconButton(
           tooltip: 'Show inspector',
           onPressed: () {
-            api.from(layoutFeature).activeTab.setTab('inspector');
+            api.of(layoutFeature).activeTab.setTab('inspector');
           },
           icon: const Icon(Icons.biotech),
         );

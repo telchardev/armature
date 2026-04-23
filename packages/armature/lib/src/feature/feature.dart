@@ -67,6 +67,22 @@ class _FeatureStatusStore extends Store<FeatureStatus> {
   }
 }
 
+/// Framework-internal record of a single `(port, handler)` binding a
+/// feature installed via `usePipe` / `useBehavior` / slot extensions.
+///
+/// Stored per-feature so each new `AppContainer.start()` can re-apply the
+/// registration after a previous container's teardown cleared the port's
+/// handler map. The handler reference is erased to [Function] because the
+/// feature owns bindings for multiple port kinds with distinct handler
+/// signatures; the port itself carries the concrete type via
+/// `Port<..., THandler>`.
+class _PortBinding {
+  final AnyPort port;
+  final Function handler;
+
+  const _PortBinding(this.port, this.handler);
+}
+
 /// Framework-internal state bag attached to every [Feature]. Never
 /// referenced by application code — reach it only through the `@internal`
 /// [Feature.internal] accessor.
@@ -80,6 +96,13 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
 
   final Set<AnyPort> _ports = {};
 
+  /// Bindings declared via `..usePipe(...)` / `..useBehavior(...)` /
+  /// slot extensions. Populated at feature-construction time (when the
+  /// cascade calls run lazily on the top-level `final`) and re-applied
+  /// by [ensureHandlersRegistered] on every subsequent container start,
+  /// so top-level feature instances survive container teardown + restart.
+  final List<_PortBinding> _portBindings = [];
+
   StoresFactory<TStores>? _storesFactory;
 
   final ExportsFactory<TStores, TExports>? _exportsFactory;
@@ -91,7 +114,12 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
   TExports? _exportsCached;
   bool _exportsComputed = false;
 
-  final _FeatureStatusStore _statusStore = _FeatureStatusStore();
+  // Non-final: replaced with a fresh instance in [teardown] so each
+  // container lifecycle gets its own status store. Users capturing a
+  // reference via `parentApi.statusOf(...)` in one container see a
+  // disposed (stale-reading, silent-writing) store after that
+  // container's dispose — the next container exposes a new instance.
+  _FeatureStatusStore _statusStore = _FeatureStatusStore();
 
   // --- Reactive lifecycle state (driven by AppContainer) ---
 
@@ -128,9 +156,9 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
   CleanupBag currentCleanup = CleanupBag.sealed();
 
   /// Error sink carried through activations so sealed bags replacing
-  /// [currentCleanup] during `deactivate` / `resetForRestart` keep
-  /// routing late-`add` disposer failures to the container's
-  /// `errorHandler` (rather than silently swallowing them).
+  /// [currentCleanup] during `deactivate` / [teardown] keep routing
+  /// late-`add` disposer failures to the container's `errorHandler`
+  /// (rather than silently swallowing them).
   void Function(Object error, StackTrace stack)? _cleanupOnError;
 
   /// Own-level activation flag. Default `true`; set to `false` when
@@ -247,6 +275,31 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
     _ports.add(port);
   }
 
+  /// Records a `(port, handler)` binding declared at feature-construction
+  /// time. Paired with [ensureHandlersRegistered], which re-applies the
+  /// binding on every container start — top-level feature instances
+  /// need this because a previous container's teardown wipes the port's
+  /// handler map, and the original `..usePipe(...)` cascade only runs
+  /// once (at class-level lazy init).
+  @meta.internal
+  void registerBinding({required AnyPort port, required Function handler}) {
+    _portBindings.add(_PortBinding(port, handler));
+  }
+
+  /// Re-applies every binding recorded via [registerBinding] to its
+  /// port, but only when that port has no handler for [feature] yet.
+  /// Invoked by the feature orchestrator at the start of the construct
+  /// phase so handlers that were stripped during a previous teardown
+  /// come back before any port is applied.
+  @meta.internal
+  void ensureHandlersRegistered(AnyFeature feature) {
+    for (final binding in _portBindings) {
+      if (!binding.port.hasHandlerFor(feature)) {
+        binding.port.addHandler(handler: binding.handler, feature: feature);
+      }
+    }
+  }
+
   /// Per-activation transition. Stores are already constructed by the
   /// container (eager construct phase); here we only set up the fresh
   /// per-activation [CleanupBag] and await the user's `onStart`
@@ -345,10 +398,27 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
     currentCleanup = CleanupBag.sealed(onError: _cleanupOnError);
   }
 
-  /// AppContainer-dispose teardown. Awaits the lifetime [lifetimeCleanup]
-  /// bag (disposer errors are routed through the bag's own `onError`,
-  /// bound when the orchestrator layer created it) and disposes every
-  /// tracked [Store]. Store-dispose errors are routed through [onError].
+  /// Container-lifecycle teardown. Runs the lifetime [lifetimeCleanup]
+  /// bag (disposer errors routed through the bag's `onError`, bound by
+  /// the orchestrator when the graph was built), disposes every tracked
+  /// user [Store], and restores this feature to the freshly-constructed
+  /// baseline so a **future** `AppContainer` can reuse the same instance
+  /// (the canonical idiom — features as top-level `final`s, `ArmatureApp`
+  /// widgets that remount).
+  ///
+  /// Baseline restoration means:
+  ///   * `_scopeApi` / `_exportsCached` null'd — the next construct
+  ///     phase runs the stores factory again.
+  ///   * Lifetime and per-activation cleanup bags replaced with fresh
+  ///     sealed ones (any stray late `add` runs the disposer inline).
+  ///   * `_statusStore` disposed and replaced with a new instance —
+  ///     cross-container listener leaks are avoided, and subsequent
+  ///     activation writes land on the new store (a disposed store
+  ///     silently drops writes).
+  ///   * `ownActive` reset to the constructor default (`false` when an
+  ///     activation setup is installed, `true` otherwise).
+  ///
+  /// Store-dispose errors are routed through [onError].
   @meta.internal
   Future<void> teardown({
     required void Function(Object error, StackTrace stack) onError,
@@ -371,34 +441,14 @@ class FeatureInternal<TStores extends Object?, TExports extends Object?> {
     } on Object catch (e, st) {
       onError(e, st);
     }
+    _statusStore = _FeatureStatusStore();
 
-    // Final dispose: restore `ownActive` to the same default
-    // [resetForRestart] uses, so the feature's inspection-visible
-    // state is consistent whether the container tore down normally
-    // or rolled back. Feature shouldn't be reused after teardown, but
-    // debug tooling can still read the field cleanly.
-    ownActive = activationSetup == null;
-  }
-
-  /// Restores feature-internal state to the freshly-constructed baseline
-  /// so a subsequent `AppContainer.start()` call can rebuild everything
-  /// from scratch. Invoked only by the polished-rollback path after
-  /// [teardown].
-  ///
-  /// Specifically: drops the cached scope API + stores, replaces
-  /// per-activation and lifetime cleanup bags with fresh sealed ones,
-  /// and resets `ownActive` to the same default the [FeatureInternal]
-  /// constructor / [Feature.activation] established — `false` when an
-  /// activation setup is installed (waits for `toggle(.active)`),
-  /// `true` otherwise (auto-active).
-  @meta.internal
-  void resetForRestart() {
     _scopeApi = null;
     _exportsCached = null;
     _exportsComputed = false;
-    // Lifetime bag was run by [teardown]; seal it so any stray late
-    // `add` runs the disposer immediately. The orchestrator layer installs
-    // a fresh open bag when it rebuilds the graph.
+    // The orchestrator installs a fresh open bag when it rebuilds the
+    // graph; sealed bags here mean any stray late `add` runs the
+    // disposer inline instead of silently swallowing it.
     lifetimeCleanup = CleanupBag.sealed();
     currentCleanup = CleanupBag.sealed();
     ownActive = activationSetup == null;
@@ -581,6 +631,7 @@ final class Feature<
 
     port.addHandler(handler: wrappedHandler, feature: this);
     _internal.usePort(port: port);
+    _internal.registerBinding(port: port, handler: wrappedHandler);
   }
 
   /// Registers this feature's [handler] as a transformation step in a
@@ -606,6 +657,7 @@ final class Feature<
 
     port.addHandler(handler: wrappedHandler, feature: this);
     _internal.usePort(port: port);
+    _internal.registerBinding(port: port, handler: wrappedHandler);
   }
 
   /// Replaces the stores factory for this feature. Primary use case
@@ -621,7 +673,7 @@ final class Feature<
   ///
   /// The replacement factory must have the same `TStores` type as the
   /// original; the `exports:` factory attached at [createFeature] is
-  /// re-run against the new stores on the next `api.from(thisFeature)`
+  /// re-run against the new stores on the next `api.of(thisFeature)`
   /// access.
   void useStores(StoresFactory<TStores> factory) {
     _internal.useStores(factory);
@@ -632,7 +684,7 @@ final class Feature<
 ///
 /// **Contract.** A feature that declares `stores:` must also declare
 /// `exports:` — the record returned to descendants via
-/// `api.from(thisFeature)`. Use `exports: (api) => api.own` for a
+/// `api.of(thisFeature)`. Use `exports: (api) => api.own` for a
 /// passthrough (stores visible as-is); narrow the record to hide
 /// implementation details.
 ///

@@ -104,9 +104,8 @@ enum FeatureResolutionReason {
   /// list (originally surfaces as `GraphNodeNotFoundError`).
   missingParent,
 
-  /// `api.of(feature)` / `api.from(feature)` was called with a feature
-  /// that is not in the caller's declared parents (neither required
-  /// nor optional).
+  /// `api.of(feature)` was called with a feature that is not in the
+  /// caller's declared parents (neither required nor optional).
   notDeclaredParent,
 
   /// The user-supplied `stores` factory threw during the container's

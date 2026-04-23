@@ -15,7 +15,7 @@ typedef StoresFactory<TStores> = TStores Function(FeatureParentApi parentApi);
 ///
 /// Receives a [FeatureScopeApi] pointing at this feature's already-built
 /// stores; returns whatever record / object the feature wants to expose
-/// to child features via `api.from(thisFeature)`. Run once (memoized) on
+/// to child features via `api.of(thisFeature)`. Run once (memoized) on
 /// first external access.
 ///
 /// Use `(api) => api.own` for a passthrough view that mirrors stores;
@@ -129,7 +129,7 @@ class FeatureHandlerContext {
 
   /// Returns typed exports of a parent [feature]. See
   /// [FeatureParentApi.of].
-  TExports from<TExports>(Feature<dynamic, TExports, dynamic> feature) {
+  TExports of<TExports>(Feature<dynamic, TExports, dynamic> feature) {
     return parent.of(feature);
   }
 

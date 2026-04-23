@@ -18,7 +18,7 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   ///
   /// [handler] receives the slot's `data` payload and a typed
   /// [FeatureScopeApi] scoped to this feature (`api.own` for own
-  /// stores, `api.from(parent)` for parent exports). Return `null` to
+  /// stores, `api.of(parent)` for parent exports). Return `null` to
   /// abstain for that particular `data` payload; return a [Widget]
   /// to contribute it — the widget wins the slot if its [priority] is
   /// the highest among active contributors (ties go to the
@@ -51,6 +51,7 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
 
     slot.addHandler(handler: wrappedHandler, feature: this as AnyFeature);
     internal.usePort(port: slot);
+    internal.registerBinding(port: slot, handler: wrappedHandler);
   }
 
   /// Registers [handler] against a parent's [MultiSlot].
@@ -85,5 +86,6 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
 
     slot.addHandler(handler: wrappedHandler, feature: this as AnyFeature);
     internal.usePort(port: slot);
+    internal.registerBinding(port: slot, handler: wrappedHandler);
   }
 }

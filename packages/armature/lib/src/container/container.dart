@@ -283,7 +283,7 @@ final class AppContainer {
       }
     }
 
-    await _teardownFeatures(resetForRestart: false);
+    await _teardownFeatures(forRestart: false);
 
     for (final cb in _disposeCallbacks) {
       try {
@@ -305,25 +305,37 @@ final class AppContainer {
   /// Tears down every feature via the lifecycle layer (which handles
   /// graph shutdown — including draining its activation-concurrency
   /// semaphore — and per-feature store cleanup), clears reaction
-  /// tracking, and clears resolve-time stats.
+  /// tracking, and clears resolve-time stats. Feature internal state is
+  /// always restored to the freshly-constructed baseline inside
+  /// [FeatureInternal.teardown] so the same top-level instance can be
+  /// reused in a future container.
   ///
-  /// When [resetForRestart] is `true`:
-  ///   * Per-feature internal state is reset and the graph is discarded
-  ///     so a subsequent [start] builds everything fresh.
+  /// When [forRestart] is `true` (polished-rollback):
+  ///   * The orchestrator drops its graph so a subsequent [start]
+  ///     builds everything fresh.
   ///   * Port handlers registered statically at feature-construction
   ///     time (via `usePipe`, `useBehavior`, …) are **kept** — a retry
-  ///     needs them in place, since `usePipe` isn't re-invoked.
+  ///     needs them in place, since the class-level cascade isn't
+  ///     re-invoked.
   ///   * Events stay alive (no `dispose()`), since the container is
   ///     still usable.
   ///
-  /// When [resetForRestart] is `false` (full dispose):
+  /// When [forRestart] is `false` (full dispose):
   ///   * Port handlers are deregistered so top-level ports shared
   ///     across container instances don't accumulate stale entries.
+  ///     The next container's construct phase re-registers them from
+  ///     each feature's recorded bindings.
   ///   * Events are disposed.
-  Future<void> _teardownFeatures({required bool resetForRestart}) async {
-    await _orchestrator.teardown(resetForRestart: resetForRestart);
+  Future<void> _teardownFeatures({required bool forRestart}) async {
+    await _orchestrator.teardown();
 
-    if (!resetForRestart) {
+    if (!forRestart) {
+      // Full dispose: strip port handlers (prevents top-level ports from
+      // pinning feature instances after the container dies) and dispose
+      // container-scoped events. On rollback, keep both alive — the
+      // next start() retry reuses the same feature instances and the
+      // original `..usePipe(...)` registration order, and outside
+      // subscribers still observe the live container.
       for (final feature in _features) {
         for (final port in feature.internal.ports) {
           port.removeHandler(feature: feature);
@@ -333,7 +345,7 @@ final class AppContainer {
 
     _resolveTimes.clear();
 
-    if (!resetForRestart) {
+    if (!forRestart) {
       _events.dispose();
     }
   }
@@ -652,7 +664,7 @@ final class AppContainer {
   /// subsequent `start()` can then run without replaying stale
   /// handlers or partially-initialised stores.
   Future<void> _rollback() async {
-    await _teardownFeatures(resetForRestart: true);
+    await _teardownFeatures(forRestart: true);
     if (_status != ContainerStatus.disposed) _status = ContainerStatus.idle;
   }
 
