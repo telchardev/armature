@@ -1,0 +1,56 @@
+name: armature_example
+description: A new Flutter project.
+
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.9.0
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.9
+  logger: ^2.7.0
+  shared_preferences: ^2.5.5
+  google_fonts: ^8.0.2
+  armature:
+    path: ../../packages/armature
+  armature_flutter:
+    path: ../../packages/armature_flutter
+
+dev_dependencies:
+  shared_analyzer:
+flutter:
+  uses-material-design: true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

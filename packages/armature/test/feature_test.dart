@@ -1,0 +1,556 @@
+import 'package:armature/armature.dart';
+import 'package:mockito/mockito.dart';
+import 'package:test/test.dart';
+
+import '_helpers.dart';
+import 'feature_listeners.mocks.dart';
+
+typedef CounterState = ({int counter});
+typedef UserState = ({int id, String name});
+
+class CounterService extends Store<CounterState> {
+  CounterService({required super.state});
+
+  void increment() {
+    update((state) => (counter: state.counter + 1));
+  }
+}
+
+class UserService extends Store<UserState> {
+  UserService({required super.state});
+}
+
+class TestRepositories {
+  final int firstRepository;
+
+  TestRepositories(this.firstRepository);
+}
+
+// Typed services containers
+class FirstStores {
+  final CounterService counter;
+  final UserService user;
+
+  FirstStores({required this.counter, required this.user});
+}
+
+class SecondStores {
+  final CounterService counter;
+
+  SecondStores({required this.counter});
+}
+
+class _TestService extends Store<int> {
+  _TestService() : super(state: 0);
+
+  void setValue(int value) {
+    state = value;
+  }
+}
+
+void main() {
+  group('Feature tests', () {
+    test('typed servicesFactory', () async {
+      var counterService = CounterService(state: (counter: 0));
+      var userService = UserService(state: (id: 1, name: "Test user"));
+
+      final firstFeature = createFeature(
+        name: "firstFeature",
+        stores: (parentApi) {
+          return FirstStores(counter: counterService, user: userService);
+        },
+        exports: (api) => api.own,
+      );
+
+      final container = AppContainer(features: [firstFeature]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      final stores = firstFeature.internal.scopeApi.stores as FirstStores;
+      expect(stores.counter, equals(counterService));
+      expect(stores.user, equals(userService));
+    });
+
+    test('parentApi.of() provides typed access to parent stores', () async {
+      var userService = UserService(state: (id: 1, name: "Test user"));
+
+      final firstFeature = createFeature(
+        name: "firstFeature",
+        stores: (parentApi) {
+          return FirstStores(
+            counter: CounterService(state: (counter: 0)),
+            user: userService,
+          );
+        },
+        exports: (api) => api.own,
+      );
+
+      final secondFeature =
+          createFeature(name: "secondFeature", dependsOn: [firstFeature])
+            ..activation((parentApi, toggle, _) {
+              final parentServices = parentApi.of(firstFeature);
+              expect(parentServices.user, equals(userService));
+              toggle(ToggleState.active);
+            });
+
+      final container = AppContainer(features: [firstFeature, secondFeature]);
+      addTearDown(container.dispose);
+      await container.start();
+    });
+
+    test('services factory can construct repositories in closure', () async {
+      final repositories = TestRepositories(0);
+      TestRepositories? factoredRepositories;
+
+      final firstFeature = createFeature(
+        name: "firstFeature",
+        stores: (parentApi) {
+          factoredRepositories = repositories;
+          return null;
+        },
+        exports: (api) => api.own,
+      );
+
+      var container = AppContainer(features: [firstFeature]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      expect(factoredRepositories, equals(repositories));
+    });
+
+    test('useStores overrides stores factory before start', () async {
+      final repositories = TestRepositories(0);
+      final newRepositories = TestRepositories(1);
+      TestRepositories? factoredRepositories;
+
+      final firstFeature = createFeature(
+        name: "firstFeature",
+        stores: (parentApi) {
+          factoredRepositories = repositories;
+          return null;
+        },
+        exports: (api) => api.own,
+      );
+
+      var container = AppContainer(
+        features: [
+          firstFeature..useStores((parentApi) {
+            factoredRepositories = newRepositories;
+            return null;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.start();
+
+      expect(factoredRepositories, equals(newRepositories));
+    });
+
+    test('useStores after start throws FeatureResolutionError', () async {
+      final feature = createFeature(
+        name: "late-override",
+        stores: (parentApi) => null,
+        exports: (api) => api.own,
+      );
+
+      final container = AppContainer(features: [feature]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      expect(
+        () => feature.useStores((_) => null),
+        throwsA(isA<FeatureResolutionError>()),
+      );
+    });
+
+    test('observe tracks service state mutations; onPortChanged is '
+        'handler-set only', () async {
+      final listeners = MockListeners();
+      final pipeFeature = createFeature(name: "pipeFeature");
+      final intPipe = createPipe<int>(name: "one", feature: pipeFeature);
+
+      final counterService = CounterService(state: (counter: 0));
+
+      final feature = createFeature(
+        name: "feature",
+        dependsOn: [pipeFeature],
+        stores: (parentApi) {
+          return SecondStores(counter: counterService);
+        },
+        exports: (api) => api.own,
+      );
+
+      feature.usePipe(intPipe, (value, api) {
+        return value + api.own.counter.state.counter;
+      });
+
+      var container = AppContainer(features: [pipeFeature, feature]);
+      addTearDown(container.dispose);
+
+      container.onPortChanged(port: intPipe, callback: listeners.onPortChanged);
+
+      await container.start();
+
+      // Activation cascade emits one portChanged per port-using feature.
+      verify(listeners.onPortChanged()).called(1);
+
+      // observe() is the reactive path: its per-subscriber Reaction
+      // tracks atoms the handler reads, so state mutations update the
+      // value through `onChanged` WITHOUT emitting portChanged.
+      // `onPortChanged` is now a pure handler-set stream — it does NOT
+      // fire on atom-driven re-applies.
+      var observerChanges = 0;
+      final sub = container.observe(
+        rootFeature: pipeFeature,
+        port: intPipe,
+        initialValue: 0,
+        data: null,
+        onChanged: () => observerChanges++,
+      );
+      addTearDown(sub.dispose);
+
+      expect(sub.value, equals(0));
+
+      counterService.increment();
+      counterService.increment();
+
+      expect(observerChanges, equals(2));
+      expect(sub.value, equals(2));
+      // No more portChanged emits — state mutation is a reactive
+      // event, not a handler-set event.
+      verifyNoMoreInteractions(listeners);
+    });
+
+    test('feature without storesFactory has null stores', () async {
+      final feature = createFeature(name: "bare");
+      final container = AppContainer(features: [feature]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      expect(feature.internal.scopeApi.stores, isNull);
+    });
+
+    test('Store.dispose() clears all listeners', () {
+      final service = _TestService();
+      var callCount = 0;
+
+      service.subscribe((_, _) {
+        callCount++;
+      });
+
+      service.setValue(1);
+      expect(callCount, equals(1));
+
+      service.dispose();
+
+      service.setValue(2);
+      expect(callCount, equals(1));
+    });
+
+    test('feature with no dependsOn should resolve as root', () async {
+      final feature = createFeature(name: "standalone");
+      final container = AppContainer(features: [feature]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
+    });
+
+    test(
+      'parentApi.of() throws FeatureResolutionError on non-parent feature',
+      () async {
+        final featureA = createFeature(name: "a");
+        final featureB = createFeature(name: "b");
+
+        final child = createFeature(name: "child", dependsOn: [featureA])
+          ..activation((parentApi, toggle, _) {
+            expect(
+              () => parentApi.of(featureB),
+              throwsA(isA<FeatureResolutionError>()),
+            );
+            toggle(ToggleState.active);
+          });
+
+        final container = AppContainer(features: [featureA, featureB, child]);
+        addTearDown(container.dispose);
+        await container.start();
+      },
+    );
+
+    test(
+      'parentApi.of() throws notDeclaredParent when feature is not a parent',
+      () async {
+        final stranger = createFeature(name: "stranger");
+        Object? thrown;
+        final child = createFeature(name: "child")
+          ..activation((parentApi, toggle, _) {
+            try {
+              parentApi.of(stranger);
+            } on Object catch (e) {
+              thrown = e;
+            }
+            toggle(ToggleState.active);
+          });
+
+        final container = AppContainer(features: [stranger, child]);
+        addTearDown(container.dispose);
+        await container.start();
+
+        expect(thrown, isA<FeatureResolutionError>());
+        expect(
+          (thrown! as FeatureResolutionError).reason,
+          equals(FeatureResolutionReason.notDeclaredParent),
+        );
+      },
+    );
+
+    test(
+      'parentApi.of() provides typed access to an optional parent',
+      () async {
+        final optional = createFeature(
+          name: "optional",
+          stores: (parentApi) => FirstStores(
+            counter: CounterService(state: (counter: 0)),
+            user: UserService(state: (id: 7, name: "opt")),
+          ),
+          exports: (api) => api.own,
+        );
+
+        UserService? seenUser;
+        final child =
+            createFeature(name: "child", optionalDependsOn: [optional])
+              ..activation((parentApi, toggle, _) {
+                seenUser = parentApi.of(optional).user;
+                toggle(ToggleState.active);
+              });
+
+        final container = AppContainer(features: [optional, child]);
+        addTearDown(container.dispose);
+        await container.start();
+
+        expect(seenUser, isNotNull);
+        expect(seenUser!.state.id, equals(7));
+      },
+    );
+
+    test('activation setup can access typed parent services', () async {
+      final parent = createFeature(
+        name: "parent",
+        stores: (parentApi) {
+          return FirstStores(
+            counter: CounterService(state: (counter: 0)),
+            user: UserService(state: (id: 1, name: "Test")),
+          );
+        },
+        exports: (api) => api.own,
+      );
+
+      var parentAccessWorked = false;
+
+      final child = createFeature(name: "child", dependsOn: [parent])
+        ..activation((parentApi, toggle, _) {
+          final services = parentApi.of(parent);
+          expect(services, isA<FirstStores>());
+          parentAccessWorked = true;
+          toggle(ToggleState.active);
+        });
+
+      final container = AppContainer(features: [parent, child]);
+      addTearDown(container.dispose);
+      await container.start();
+
+      expect(parentAccessWorked, isTrue);
+    });
+
+    test('activation() called twice throws FeatureConfigurationError', () {
+      final feature = createFeature(name: "f");
+      feature.activation((_, _, _) {});
+
+      expect(
+        () => feature.activation((_, _, _) {}),
+        throwsA(isA<FeatureConfigurationError>()),
+      );
+    });
+
+    test('onStart() called twice throws FeatureConfigurationError', () {
+      final feature = createFeature(name: "f");
+      feature.onStart((_, _) {});
+
+      expect(
+        () => feature.onStart((_, _) {}),
+        throwsA(isA<FeatureConfigurationError>()),
+      );
+    });
+
+    test(
+      'factory throw aborts start() fail-fast and rolls back to idle',
+      () async {
+        var calls = 0;
+        final feature = createFeature<void, void, void>(
+          name: "bad-factory",
+          stores: (_) {
+            calls++;
+            throw StateError('factory failed');
+          },
+          exports: (api) => api.own,
+        );
+
+        final container = AppContainer(
+          features: [feature],
+          options: silentOptions(),
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container.start,
+          throwsA(
+            isA<FeatureResolutionError>().having(
+              (e) => e.reason,
+              'reason',
+              FeatureResolutionReason.storesFactoryFailed,
+            ),
+          ),
+        );
+        expect(calls, equals(1));
+        expect(container.status, equals(ContainerStatus.idle));
+
+        // A retry should re-invoke the factory fresh — the polished
+        // rollback cleared the cached `_scopeApi`/state.
+        await expectLater(
+          container.start,
+          throwsA(isA<FeatureResolutionError>()),
+        );
+        expect(calls, equals(2));
+      },
+    );
+
+    test('duplicate Store of same runtime type throws', () async {
+      final feature = createFeature(
+        name: "dup",
+        stores: (parentApi) {
+          CounterService(state: (counter: 0));
+          return CounterService(state: (counter: 1));
+        },
+        exports: (api) => api.own,
+      );
+
+      final container = AppContainer(
+        features: [feature],
+        options: silentOptions(),
+      );
+      addTearDown(container.dispose);
+
+      // Factory throws during tracking → fail-fast aborts start().
+      await expectLater(
+        container.start,
+        throwsA(isA<FeatureResolutionError>()),
+      );
+    });
+
+    test(
+      'services factory can call parentApi.of(requiredParent) directly',
+      () async {
+        final parentService = CounterService(state: (counter: 42));
+        final parent = createFeature<_ParentServices, _ParentServices, void>(
+          name: "eager-parent",
+          stores: (_) => (counter: parentService),
+          exports: (api) => api.own,
+        );
+
+        CounterService? capturedInChildFactory;
+        final child = createFeature(
+          name: "eager-child",
+          dependsOn: [parent],
+          stores: (parentApi) {
+            // Eager construct runs parents first in topo order, so
+            // `of(parent)` works right inside the child's factory.
+            capturedInChildFactory = parentApi.of(parent).counter;
+            return null;
+          },
+          exports: (api) => api.own,
+        );
+
+        final container = AppContainer(features: [parent, child]);
+        addTearDown(container.dispose);
+        await container.start();
+
+        expect(capturedInChildFactory, same(parentService));
+      },
+    );
+
+    test(
+      'factory throw in parent aborts start() before child factory runs',
+      () async {
+        var childFactoryCalled = false;
+        final parent = createFeature(
+          name: "bad-parent",
+          stores: (_) => throw StateError('parent factory boom'),
+          exports: (api) => api.own,
+        );
+        final child = createFeature(
+          name: "closed-child",
+          dependsOn: [parent],
+          stores: (_) {
+            childFactoryCalled = true;
+            return null;
+          },
+          exports: (api) => api.own,
+        );
+
+        final container = AppContainer(
+          features: [parent, child],
+          options: silentOptions(),
+        );
+        addTearDown(container.dispose);
+
+        // Fail-fast on the parent factory throw — child factory never
+        // runs because the construct phase bails on the first error.
+        await expectLater(
+          container.start,
+          throwsA(isA<FeatureResolutionError>()),
+        );
+        expect(childFactoryCalled, isFalse);
+        expect(container.status, equals(ContainerStatus.idle));
+      },
+    );
+
+    test(
+      'factory throw in optional parent still aborts start() fail-fast',
+      () async {
+        final optionalParent = createFeature(
+          name: "opt-parent",
+          stores: (_) => throw StateError('opt factory boom'),
+          exports: (api) => api.own,
+        );
+
+        final child = createFeature(
+          name: "opt-child",
+          optionalDependsOn: [optionalParent],
+          stores: (_) => null,
+          exports: (api) => api.own,
+        );
+
+        final container = AppContainer(
+          features: [optionalParent, child],
+          options: silentOptions(),
+        );
+        addTearDown(container.dispose);
+
+        // Optional vs required parent only differs at cascade time
+        // (activation / deactivation). Factory failures are binary:
+        // if any declared feature fails to construct, the whole
+        // container can't start. Users who want resilience should
+        // wrap the factory in try/catch and return a null / fallback
+        // services value.
+        await expectLater(
+          container.start,
+          throwsA(isA<FeatureResolutionError>()),
+        );
+        expect(container.status, equals(ContainerStatus.idle));
+      },
+    );
+  });
+}
+
+typedef _ParentServices = ({CounterService counter});

@@ -1,0 +1,60 @@
+name: armature_workspace
+publish_to: none
+repository: https://github.com/telchardev/armature
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - packages/armature
+  - packages/armature_graph
+  - packages/armature_reactive
+  - packages/armature_flutter
+  - examples/armature_example
+  - shared/analyzer
+
+dev_dependencies:
+  melos: ^7.5.1
+
+melos:
+  name: armature
+
+  command:
+    bootstrap:
+      usePubspecOverrides: true
+
+    version:
+      branch: main
+      linkToCommits: true
+      workspaceChangelog: true
+      updateGitTagRefs: true
+      message: 'chore(release): publish'
+
+  scripts:
+    lint:all:
+      run: melos run analyze && melos run format
+      description: Run all static analysis checks.
+
+    clean:force:
+      run: melos clean && melos exec -- flutter clean && melos bootstrap
+      description: Run `flutter clean` for all packages.
+
+    analyze:
+      run: melos exec -- flutter analyze --fatal-infos
+      description: Run `flutter analyze` for all packages.
+
+    upgrade:
+      run: melos exec -- flutter pub upgrade --major-versions
+      description: Run `flutter upgrade` for all packages.
+
+    outdated:
+      run: melos exec -- flutter pub outdated
+      description: Run `flutter outdated` for all packages.
+
+    format:
+      run: melos exec dart format .
+      description: Run `dart format` for all packages.
+
+    test:
+      run: melos exec --dir-exists=test -- "flutter test"
+      description: Run all Flutter tests in this project.

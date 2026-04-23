@@ -1,0 +1,5 @@
+include: package:shared_analyzer/flutter.yaml
+analyzer:
+  exclude:
+    - "**/*.freezed.dart"
+    - "**/generated/**"
