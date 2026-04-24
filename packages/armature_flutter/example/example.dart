@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 /// compose one screen through ports, without knowing about each other:
 ///
 /// - **Layout** (root) owns three ports: a tabs `Pipe`, a body
-///   `SingleSwitchSlot` (route-keyed), an actions `MultiSlot`.
+///   `KeyedSingleSlot` (indexed by a string key), an actions `MultiSlot`.
 /// - **Counter** contributes a tab, a body, and a `+` button.
 /// - **History** `optionalDependsOn: [counter]` and activates via
 ///   `whenActive(counter)` — when counter is toggled off, History
@@ -43,17 +43,14 @@ typedef TabSpec = ({String id, String label});
 // ── Ports (owner: layoutFeature) ──
 
 final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
-final bodySwitchSlot = createSingleSwitchSlot<String>(name: 'layout.body');
-final actionsSlot = createMultiSlot<String>(
-  name: 'layout.actions',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+final bodyKeyedSlot = createKeyedSingleSlot<String>(name: 'layout.body');
+final actionsSlot = createMultiSlot<String>(name: 'layout.actions');
 
 // ── Features ──
 
 final layoutFeature = createFeature(
   name: 'Layout',
-  ports: (tabs: tabsPipe, body: bodySwitchSlot, actions: actionsSlot),
+  ports: (tabs: tabsPipe, body: bodyKeyedSlot, actions: actionsSlot),
   stores: (_) => (activeTab: ActiveTabStore()),
   exports: (api) => api.own,
 );
@@ -164,7 +161,7 @@ class _Shell extends StatelessWidget {
             ),
           ),
           body: SingleSlotProvider(
-            slot: bodySwitchSlot(activeTab.state),
+            slot: bodyKeyedSlot(activeTab.state),
             data: activeTab.state,
             builder: (child, _) =>
                 child ?? const Center(child: Text('empty tab')),

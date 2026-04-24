@@ -119,7 +119,6 @@ class AuthStore extends Store<({User? user})> {
       await Future.delayed(const Duration(milliseconds: 200));
       update((_) => (user: (name: name)));
     },
-    strategy: TaskStrategy.queue,
   );
 
   void logout() => update((_) => (user: null));

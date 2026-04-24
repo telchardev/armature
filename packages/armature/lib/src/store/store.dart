@@ -111,10 +111,11 @@ abstract class Store<TState extends Object?> {
   /// Creates a parameterised async [Task] with an observable state
   /// machine (`TaskIdle → TaskPending → TaskDone|TaskFailed`).
   ///
-  /// Pick a [TaskStrategy] that matches the call pattern: `.once` for
-  /// deduplicated one-shot requests, `.queue` for FIFO serialisation,
-  /// `.latest` for supersede-in-flight, `.debounce(d)` for coalescing
-  /// rapid calls, `.throttle(d)` for rate-limited fire.
+  /// [strategy] defaults to [TaskStrategy.queue] — FIFO serialisation,
+  /// the most common call pattern. Override for other semantics:
+  /// `.once` for deduplicated one-shot requests, `.latest` for
+  /// supersede-in-flight, `.debounce(d)` for coalescing rapid calls,
+  /// `.throttle(d)` for rate-limited fire.
   ///
   /// The task is owned by this store — [dispose] cascades to it,
   /// rejecting any in-flight calls with [TaskError].
@@ -125,7 +126,7 @@ abstract class Store<TState extends Object?> {
     TError extends Object?
   >({
     required TaskFn<TParams, TResult, TError> fn,
-    required TaskStrategy strategy,
+    TaskStrategy strategy = TaskStrategy.queue,
   }) {
     final task = create<TParams, TResult, TError>(fn: fn, strategy: strategy);
     _tasks.add(task);
@@ -136,13 +137,14 @@ abstract class Store<TState extends Object?> {
   /// — no `null` argument required — and compile-time safety is
   /// preserved for parameterised tasks created via [createTask].
   ///
-  /// Accepts the same [TaskStrategy] variants as [createTask]; [dispose]
-  /// cascades to this task too.
+  /// [strategy] defaults to [TaskStrategy.queue]; accepts the same
+  /// variants as [createTask]. [dispose] cascades to this task too.
   @protected
-  VoidTask<TResult, TError> createVoidTask<
-    TResult extends Object?,
-    TError extends Object?
-  >({required Future<TResult> Function() fn, required TaskStrategy strategy}) {
+  VoidTask<TResult, TError>
+  createVoidTask<TResult extends Object?, TError extends Object?>({
+    required Future<TResult> Function() fn,
+    TaskStrategy strategy = TaskStrategy.queue,
+  }) {
     final task = createVoid<TResult, TError>(fn: fn, strategy: strategy);
     _tasks.add(task);
     return task;

@@ -5,11 +5,6 @@ import './auth_repository.dart';
 typedef User = ({String name});
 typedef AuthState = ({User? user});
 
-extension AuthStateCopyWith on AuthState {
-  AuthState copyWith({User? user, bool clearUser = false}) =>
-      (user: clearUser ? null : (user ?? this.user));
-}
-
 class AuthStore extends Store<AuthState> {
   final AuthRepository _repo;
 
@@ -19,7 +14,7 @@ class AuthStore extends Store<AuthState> {
     fn: () async {
       final name = await _repo.load();
       if (name != null) {
-        update((s) => s.copyWith(user: (name: name)));
+        update((s) => (user: (name: name)));
       }
     },
     strategy: TaskStrategy.once,
@@ -28,14 +23,13 @@ class AuthStore extends Store<AuthState> {
   late final login = createTask(
     fn: (String name) async {
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      update((s) => s.copyWith(user: (name: name)));
+      update((s) => (user: (name: name)));
       await _repo.save(name);
     },
-    strategy: TaskStrategy.queue,
   );
 
   void logout() {
-    state = state.copyWith(clearUser: true);
+    state = (user: null);
     _repo.clear();
   }
 }

@@ -22,7 +22,6 @@ class OrdersStore extends Store<List<String>> {
 
   late final placeOrder = createTask<String, void, Never>(
     fn: (id) async => update((s) => [...s, id]),
-    strategy: TaskStrategy.queue,
   );
 }
 

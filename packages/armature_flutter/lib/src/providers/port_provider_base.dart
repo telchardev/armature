@@ -1,4 +1,5 @@
-import 'package:armature/armature.dart' show PortSubscription, RenderError;
+import 'package:armature/advanced.dart' show PortSubscription;
+import 'package:armature/armature.dart' show RenderError;
 import 'package:flutter/widgets.dart' show State, StatefulWidget;
 
 import '../contexts/container_context.dart' show ContainerContext;

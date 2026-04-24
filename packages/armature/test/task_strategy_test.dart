@@ -1,3 +1,11 @@
+import 'package:armature/advanced.dart'
+    show
+        TaskStrategyDebounce,
+        TaskStrategyLatest,
+        TaskStrategyOnce,
+        TaskStrategyQueue,
+        TaskStrategyThrottle,
+        VoidTask;
 import 'package:armature/armature.dart';
 import 'package:armature/src/store/task.dart' show create, createVoid;
 import 'package:test/test.dart';

@@ -1,13 +1,16 @@
+/// Core public surface of `package:armature`.
+///
+/// This barrel exposes the ~25 symbols needed to author features,
+/// stores, tasks, and declare ports. Framework plumbing —
+/// internal typedefs, port base classes, debug mirrors, and the
+/// individual `TaskStrategy*` constructors — lives in
+/// `package:armature/advanced.dart`. Reach for it only when you need
+/// to annotate a field with a handler signature, build a debug
+/// overlay, or extend the framework itself.
+library;
+
 export 'src/container/container.dart'
     show AppContainer, ContainerErrorHandler, ContainerOptions, ContainerStatus;
-export 'src/container/container_debug.dart'
-    show
-        ContainerDebug,
-        ContainerDebugExt,
-        FeatureDebugInfo,
-        FeatureDependency,
-        PortDebugInfo;
-export 'src/container/port_subscription.dart' show PortSubscription;
 export 'src/errors.dart'
     show
         ArmatureError,
@@ -41,30 +44,19 @@ export 'src/feature/feature_api.dart'
         StoresFactory;
 export 'src/feature/feature_status.dart'
     show FeatureStatus, FeatureToggle, ToggleState;
-export 'src/logger/logger.dart' show Logger, LoggerDebugInfo, LogLevel;
+export 'src/logger/logger.dart' show Logger, LogLevel;
 export 'src/logger/print_logger.dart' show PrintLogger;
 export 'src/port/behavior.dart'
-    show Behavior, BehaviorDescriptor, BehaviorHandler, createBehavior;
-export 'src/port/pipe.dart' show Pipe, PipeHandler, createPipe;
-export 'src/port/port.dart' show AnyPort, Port;
-export 'src/port/port_type.dart' show PortType;
-export 'src/store/state.dart'
-    show StateChangeListener, StateListenerDisposer, StateUpdateCallback;
+    show Behavior, BehaviorDescriptor, createBehavior;
+export 'src/port/pipe.dart' show Pipe, createPipe;
 export 'src/store/store.dart' show Store;
 export 'src/store/task.dart'
     show
         Task,
         TaskDone,
         TaskFailed,
-        TaskFn,
         TaskIdle,
         TaskPending,
         TaskState,
         TaskStrategy,
-        TaskStrategyDebounce,
-        TaskStrategyLatest,
-        TaskStrategyOnce,
-        TaskStrategyQueue,
-        TaskStrategyThrottle,
-        ThrottleEdge,
-        VoidTask;
+        ThrottleEdge;

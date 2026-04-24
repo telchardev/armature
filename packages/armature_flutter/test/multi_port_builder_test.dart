@@ -1,3 +1,4 @@
+import 'package:armature/advanced.dart' show PipeHandler;
 import 'package:armature/armature.dart';
 import 'package:armature_flutter/armature_flutter.dart';
 import 'package:armature_flutter/test_utils.dart';

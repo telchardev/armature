@@ -21,7 +21,7 @@ final authFeature =
           (id: 'auth', label: 'Auth', icon: Icons.person_outline),
         ];
       })
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('auth'), (_, api) {
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('auth'), (_, api) {
         return AuthTab(store: api.own.auth);
       })
       // Override the app-bar title when logged in.

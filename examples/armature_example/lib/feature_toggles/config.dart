@@ -19,6 +19,6 @@ final featureTogglesFeature =
           (id: 'toggles', label: 'Toggles', icon: Icons.toggle_on_outlined),
         ];
       })
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('toggles'), (_, api) {
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('toggles'), (_, api) {
         return FeatureTogglesTab(store: api.own.featureToggles);
       });

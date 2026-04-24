@@ -104,7 +104,7 @@ const _counterFeatureCode = '''final counterFeature = createFeature(
         ...tabs,
         (id: 'counter', label: 'Counter', icon: Icons.add_circle_outline),
       ])
-  ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('counter'),
+  ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('counter'),
       (mode, api) => CounterTab(store: api.own.counter, mode: mode))
   ..useMultiSlot(layoutFeature.ports.fabSlot, (_, api) {
     if (api.of(layoutFeature).activeTab.state != 'counter') return null;

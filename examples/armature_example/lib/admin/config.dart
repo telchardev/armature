@@ -27,7 +27,7 @@ final adminFeature =
         ];
       })
       // Reactive body: returns null when user is not admin.
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('admin'), (_, api) {
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('admin'), (_, api) {
         final counter = api.of(counterFeature).counter;
 
         return AdminTab(counter: counter);

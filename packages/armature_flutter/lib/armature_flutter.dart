@@ -15,11 +15,13 @@ export './src/create_feature_root.dart'
     show FeatureRootBuilder, createFeatureRoot;
 export './src/debug/feature_graph_overlay.dart' show FeatureGraphOverlay;
 export './src/feature_slot_extensions.dart';
+export './src/ports/keyed_multi_slot.dart'
+    show createKeyedMultiSlot, KeyedMultiSlot;
+export './src/ports/keyed_single_slot.dart'
+    show createKeyedSingleSlot, KeyedSingleSlot;
 export './src/ports/multi_slot.dart'
     show createMultiSlot, MultiSlotOrderDirection;
-export './src/ports/multi_switch_slot.dart' show createMultiSwitchSlot;
 export './src/ports/single_slot.dart' show createSingleSlot;
-export './src/ports/single_switch_slot.dart' show createSingleSwitchSlot;
 export './src/ports/slot_descriptor.dart'
     show SlotDescriptor, SlotLoaderBuilder;
 export './src/providers/behavior_provider.dart' show BehaviorProvider;

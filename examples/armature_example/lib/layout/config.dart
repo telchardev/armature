@@ -14,7 +14,7 @@ final layoutFeature = createFeature(
   ports: (
     titleSlot: titleSlot,
     tabsPipe: tabsPipe,
-    bodySwitchSlot: bodySwitchSlot,
+    bodyKeyedSlot: bodyKeyedSlot,
     actionsSlot: actionsSlot,
     fabSlot: fabSlot,
     themeBehavior: themeBehavior,

@@ -1,5 +1,5 @@
-import 'package:armature/armature.dart'
-    show Pipe, PipeHandler, PortSubscription;
+import 'package:armature/advanced.dart' show PipeHandler, PortSubscription;
+import 'package:armature/armature.dart' show Pipe;
 import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, State;
 

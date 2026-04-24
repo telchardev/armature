@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:armature/advanced.dart' show LoggerDebugInfo;
 import 'package:armature/armature.dart';
 import 'package:armature/src/logger/null_logger.dart';
 import 'package:test/test.dart';

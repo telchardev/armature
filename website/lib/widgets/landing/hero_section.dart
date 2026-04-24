@@ -15,7 +15,7 @@ const _sampleCode = '''final counterFeature = createFeature(
         ...tabs,
         (id: 'counter', label: 'Counter', icon: Icons.add),
       ])
-  ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('counter'),
+  ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('counter'),
       (mode, api) => CounterTab(store: api.own.counter));''';
 
 class HeroSection extends StatelessWidget {

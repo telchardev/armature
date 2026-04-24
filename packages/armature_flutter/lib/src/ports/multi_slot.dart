@@ -1,11 +1,6 @@
+import 'package:armature/advanced.dart' show Port, PortType;
 import 'package:armature/armature.dart'
-    show
-        AppContainer,
-        Feature,
-        FeatureHandlerContext,
-        FeatureStatus,
-        Port,
-        PortType;
+    show AppContainer, Feature, FeatureHandlerContext, FeatureStatus;
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:meta/meta.dart' show internal;
 
@@ -122,11 +117,13 @@ class MultiSlot<
 /// Creates a [MultiSlot], optionally owned by [feature]. Call this at
 /// top-level and reference the returned instance from child features'
 /// `useMultiSlot(...)` handlers.
+///
+/// [orderDirection] defaults to [MultiSlotOrderDirection.asc].
 MultiSlot<TInputData, MultiSlotHandler<TInputData>>
 createMultiSlot<TInputData extends Object?>({
   required String name,
   Feature? feature,
-  required MultiSlotOrderDirection orderDirection,
+  MultiSlotOrderDirection orderDirection = MultiSlotOrderDirection.asc,
 }) {
   return MultiSlot(orderDirection: orderDirection, name: name, owner: feature);
 }

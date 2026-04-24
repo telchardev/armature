@@ -418,10 +418,10 @@ void main() {
     });
   });
 
-  group('createSingleSwitchSlot', () {
+  group('createKeyedSingleSlot', () {
     test('returns same slot instance for same route', () {
       final feature = createFeature(name: "root");
-      final factory = createSingleSwitchSlot<Null>(
+      final factory = createKeyedSingleSlot<Null>(
         name: "switch",
         feature: feature,
       );
@@ -434,7 +434,7 @@ void main() {
 
     test('returns different slot instances for different routes', () {
       final feature = createFeature(name: "root");
-      final factory = createSingleSwitchSlot<Null>(
+      final factory = createKeyedSingleSlot<Null>(
         name: "switch",
         feature: feature,
       );
@@ -447,7 +447,7 @@ void main() {
 
     test('slot names follow name/route pattern', () {
       final feature = createFeature(name: "root");
-      final factory = createSingleSwitchSlot<Null>(
+      final factory = createKeyedSingleSlot<Null>(
         name: "nav",
         feature: feature,
       );
@@ -458,10 +458,10 @@ void main() {
     });
   });
 
-  group('createMultiSwitchSlot', () {
+  group('createKeyedMultiSlot', () {
     test('returns same slot instance for same route', () {
       final feature = createFeature(name: "root");
-      final factory = createMultiSwitchSlot<Null>(
+      final factory = createKeyedMultiSlot<Null>(
         name: "multi_switch",
         feature: feature,
         orderDirection: MultiSlotOrderDirection.asc,
@@ -475,7 +475,7 @@ void main() {
 
     test('returns different slot instances for different routes', () {
       final feature = createFeature(name: "root");
-      final factory = createMultiSwitchSlot<Null>(
+      final factory = createKeyedMultiSlot<Null>(
         name: "multi_switch",
         feature: feature,
         orderDirection: MultiSlotOrderDirection.desc,
@@ -489,7 +489,7 @@ void main() {
 
     test('slot names follow name/route pattern', () {
       final feature = createFeature(name: "root");
-      final factory = createMultiSwitchSlot<Null>(
+      final factory = createKeyedMultiSlot<Null>(
         name: "tabs",
         feature: feature,
         orderDirection: MultiSlotOrderDirection.asc,
@@ -502,12 +502,12 @@ void main() {
 
     test('preserves order direction from factory', () {
       final feature = createFeature(name: "root");
-      final ascFactory = createMultiSwitchSlot<Null>(
+      final ascFactory = createKeyedMultiSlot<Null>(
         name: "asc_switch",
         feature: feature,
         orderDirection: MultiSlotOrderDirection.asc,
       );
-      final descFactory = createMultiSwitchSlot<Null>(
+      final descFactory = createKeyedMultiSlot<Null>(
         name: "desc_switch",
         feature: feature,
         orderDirection: MultiSlotOrderDirection.desc,

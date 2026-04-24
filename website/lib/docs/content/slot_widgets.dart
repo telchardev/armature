@@ -94,7 +94,7 @@ class SlotWidgetsContent extends StatelessWidget {
 }
 
 const _singleSlotSource = '''SingleSlotProvider(
-  slot: layoutFeature.ports.bodySwitchSlot('counter'),
+  slot: layoutFeature.ports.bodyKeyedSlot('counter'),
   data: mode, // LayoutMode.phone / .tablet / ...
   builder: (child, context) {
     return Center(child: child ?? const Text('No content'));

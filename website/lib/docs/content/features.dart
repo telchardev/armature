@@ -180,10 +180,7 @@ const _storesSource = '''final authFeature = createFeature(
 
 const _portsSource = '''// layout/ports.dart
 final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
-final fabSlot = createMultiSlot<LayoutMode>(
-  name: 'layout.fab',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+final fabSlot = createMultiSlot<LayoutMode>(name: 'layout.fab');
 
 // layout/config.dart
 final layoutFeature = createFeature(
@@ -227,6 +224,6 @@ const _togetherSource = '''final counterFeature = createFeature(
         (id: 'counter', label: 'Counter', icon: Icons.add),
       ])
   ..useSingleSlot(
-    layoutFeature.ports.bodySwitchSlot('counter'),
+    layoutFeature.ports.bodyKeyedSlot('counter'),
     (mode, api) => CounterTab(store: api.own.counter, mode: mode),
   );''';

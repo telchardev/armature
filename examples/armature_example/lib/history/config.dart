@@ -27,6 +27,6 @@ final historyFeature =
           (id: 'history', label: 'History', icon: Icons.history),
         ];
       })
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('history'), (_, api) {
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('history'), (_, api) {
         return HistoryTab(store: api.own.history);
       });

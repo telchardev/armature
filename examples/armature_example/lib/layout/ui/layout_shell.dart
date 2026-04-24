@@ -51,7 +51,7 @@ class _Shell extends StatelessWidget {
             final title = reader.single(titleSlot, data: mode);
             final actions = reader.multi(actionsSlot, data: mode);
             final tabs = reader.pipe(tabsPipe, initialValue: const <TabSpec>[]);
-            final body = reader.single(bodySwitchSlot(current), data: mode);
+            final body = reader.single(bodyKeyedSlot(current), data: mode);
             final fab = reader.multi(fabSlot, data: mode);
 
             return Scaffold(

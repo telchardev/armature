@@ -170,10 +170,7 @@ class TogglesStore extends Store<TogglesState> {
 
 /// Multi-slot the host exposes. Every active contributor renders into it,
 /// sorted by `order`.
-final extrasSlot = createMultiSlot<Null>(
-  name: 'toggle.extras',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+final extrasSlot = createMultiSlot<Null>(name: 'toggle.extras');
 
 /// Host feature — owns the toggles store, declares the slot.
 final toggleHostFeature = createFeature(

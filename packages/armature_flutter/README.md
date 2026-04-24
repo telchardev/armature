@@ -112,8 +112,8 @@ SingleSlotProvider(
 
 - **`SingleSlot`** — picks the highest-priority widget.
 - **`MultiSlot`** — collects all active widgets, sorts by `order`.
-- **`SingleSwitchSlot` / `MultiSwitchSlot`** — route-keyed memoized
-  variants.
+- **`KeyedSingleSlot` / `KeyedMultiSlot`** — string-key-indexed
+  memoized variants (`createKeyedSingleSlot` / `createKeyedMultiSlot`).
 - **`PipeProvider` / `BehaviorProvider`** — reactive providers for
   pipe / behavior ports.
 - **`MultiPortBuilder`** — reads any mix of ports in a single builder

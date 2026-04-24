@@ -1,4 +1,4 @@
-import 'package:armature/armature.dart' show ContainerDebugExt;
+import 'package:armature/advanced.dart' show ContainerDebugExt;
 import 'package:flutter/widgets.dart';
 
 import '../contexts/container_context.dart' show ContainerContext;

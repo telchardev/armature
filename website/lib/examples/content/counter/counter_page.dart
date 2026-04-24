@@ -156,7 +156,6 @@ class CounterStore extends Store<CounterState> {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       state = (value: state.value + 1);
     },
-    strategy: TaskStrategy.queue,
   );
 
   /// Fires at most once per 400 ms, no matter how fast you tap.
@@ -172,7 +171,6 @@ class CounterStore extends Store<CounterState> {
     fn: () async {
       state = (value: 0);
     },
-    strategy: TaskStrategy.queue,
   );
 }
 ''';

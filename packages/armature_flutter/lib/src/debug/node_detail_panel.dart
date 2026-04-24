@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:armature/armature.dart'
-    show FeatureDependency, FeatureStatus, PortDebugInfo, Store;
+import 'package:armature/advanced.dart' show FeatureDependency, PortDebugInfo;
+import 'package:armature/armature.dart' show FeatureStatus, Store;
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart' show internal;
 

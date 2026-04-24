@@ -10,17 +10,11 @@ final titleSlot = createSingleSlot<LayoutMode>(name: 'layout.title');
 
 final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
 
-final bodySwitchSlot = createSingleSwitchSlot<LayoutMode>(name: 'layout.body');
+final bodyKeyedSlot = createKeyedSingleSlot<LayoutMode>(name: 'layout.body');
 
-final actionsSlot = createMultiSlot<LayoutMode>(
-  name: 'layout.actions',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+final actionsSlot = createMultiSlot<LayoutMode>(name: 'layout.actions');
 
-final fabSlot = createMultiSlot<LayoutMode>(
-  name: 'layout.fab',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+final fabSlot = createMultiSlot<LayoutMode>(name: 'layout.fab');
 
 final themeBehavior = createBehavior<ThemeMode, ThemeData>(
   name: 'layout.theme',

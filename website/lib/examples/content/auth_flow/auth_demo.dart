@@ -119,7 +119,6 @@ class SessionStore extends Store<SessionState> {
       await _repo.save(profile);
       state = (user: profile);
     },
-    strategy: TaskStrategy.queue,
   );
 
   /// Renames the signed-in user and persists.
@@ -134,7 +133,6 @@ class SessionStore extends Store<SessionState> {
       await _repo.save(updated);
       state = (user: updated);
     },
-    strategy: TaskStrategy.queue,
   );
 
   Future<void> signOut() async {

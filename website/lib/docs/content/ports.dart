@@ -78,8 +78,9 @@ class PortsContent extends StatelessWidget {
         const DocParagraph(
           'Slots are the Flutter-specific port kind. A single slot renders '
           'one widget; a multi slot renders a sorted list of widgets. Both '
-          'come in "switch" variants that take a payload so the same slot '
-          'can host different content depending on context.',
+          'come in "keyed" variants that return a slot per string key so '
+          'the same declaration can host different content depending on '
+          'context.',
         ),
         const DocParagraph('The owner declares the slot:'),
         const CodeBlock(code: _slotOwnerSource, language: 'dart'),
@@ -163,10 +164,8 @@ const _behaviorUseSource = '''..useBehavior(
   priority: 10,
 )''';
 
-const _slotOwnerSource = '''final fabSlot = createMultiSlot<LayoutMode>(
-  name: 'layout.fab',
-  orderDirection: MultiSlotOrderDirection.asc,
-);
+const _slotOwnerSource =
+    '''final fabSlot = createMultiSlot<LayoutMode>(name: 'layout.fab');
 
 final layoutFeature = createFeature(
   name: 'Layout',

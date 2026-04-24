@@ -1,5 +1,5 @@
-import 'package:armature/armature.dart'
-    show FeatureDebugInfo, FeatureStatus, Store;
+import 'package:armature/advanced.dart' show FeatureDebugInfo;
+import 'package:armature/armature.dart' show FeatureStatus, Store;
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart' show internal;
 

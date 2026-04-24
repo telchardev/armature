@@ -207,7 +207,6 @@ class AuthStore extends Store<AuthState> {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       update((_) => (user: (name: name)));
     },
-    strategy: TaskStrategy.queue,
   );
 
   void logout() => update((_) => (user: null));
@@ -522,7 +521,7 @@ See [`examples/armature_example/`](examples/armature_example/) — a synthetic *
 
 **Features:**
 
-- **Layout** — root feature. Declares every port (`titleSlot`, `tabsPipe`, `bodySwitchSlot`, `actionsSlot`, `fabSlot`, `themeBehavior`) and owns `ActiveTabStore`. The shell wires them up with `BehaviorProvider` / `SingleSlotProvider` / `MultiSlotProvider` / `PipeProvider`.
+- **Layout** — root feature. Declares every port (`titleSlot`, `tabsPipe`, `bodyKeyedSlot`, `actionsSlot`, `fabSlot`, `themeBehavior`) and owns `ActiveTabStore`. The shell wires them up with `BehaviorProvider` / `SingleSlotProvider` / `MultiSlotProvider` / `PipeProvider`.
 - **Counter** — `Store<CounterState>` with `createVoidTask` / `createTask(.queue)`. Contributes a FAB via `useMultiSlot` that returns `null` unless the Counter tab is active (conditional `null` pattern), plus an always-visible badge in the app bar.
 - **History** — depends on Counter. In `onStart`, calls `api.of(counterFeature).counter.subscribe(...)` to mirror every counter tick into its own list. Pure cross-feature reactive propagation.
 - **Auth** — repository injected into the stores factory (`SharedPrefsAuthRepository`); `createVoidTask(.once)` for `load()`, `createTask(.queue)` for `login()`. Overrides the `titleSlot` when logged in and adds a conditional logout action to `actionsSlot`.
@@ -544,7 +543,7 @@ Layout (root)
   └── InspectorSub    → Inspector (optional; activation: whenActive)
 ```
 
-**Capabilities covered:** feature DAG with `dependsOn` / `optionalDependsOn`, `Store` with records + `copyWith` extensions, `createTask` / `createVoidTask` in both `.once` and `.queue` strategies, every port kind (`Pipe` / `SingleSlot` / `SingleSwitchSlot` / `MultiSlot` / `Behavior` with priorities), conditional `null` from `useMultiSlot` / `useSingleSlot` handlers, `onStart` + `subscribe` + `cleanup` cross-feature reactive, repository injected via the stores factory + `SharedPreferences`, reactive port-handler re-evaluation, activation helpers (`whenStoreState`, `whenActive`), and typed slot data (`LayoutMode` phone/tablet).
+**Capabilities covered:** feature DAG with `dependsOn` / `optionalDependsOn`, `Store` with record state and direct record construction, `createTask` / `createVoidTask` with the default `.queue` strategy plus `.once` / `.debounce` overrides, every port kind (`Pipe` / `SingleSlot` / `KeyedSingleSlot` / `MultiSlot` / `Behavior` with priorities), conditional `null` from `useMultiSlot` / `useSingleSlot` handlers, `onStart` + `subscribe` + `cleanup` cross-feature reactive, repository injected via the stores factory + `SharedPreferences`, reactive port-handler re-evaluation, activation helpers (`whenStoreState`, `whenActive`), and typed slot data (`LayoutMode` phone/tablet).
 
 Run it with:
 

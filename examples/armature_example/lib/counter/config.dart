@@ -20,7 +20,7 @@ final counterFeature =
           (id: 'counter', label: 'Counter', icon: Icons.add_circle_outline),
         ];
       })
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('counter'), (
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('counter'), (
         mode,
         api,
       ) {

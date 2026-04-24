@@ -20,10 +20,7 @@ final inspectorFeature =
           (id: 'inspector', label: 'Inspector', icon: Icons.biotech_outlined),
         ];
       })
-      ..useSingleSlot(layoutFeature.ports.bodySwitchSlot('inspector'), (
-        _,
-        api,
-      ) {
+      ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('inspector'), (_, api) {
         return InspectorTab(store: api.own.inspector);
       })
       ..onStart((_, _) async {

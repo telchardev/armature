@@ -1,14 +1,8 @@
 import 'dart:ui' show Offset;
 
-import 'package:armature/armature.dart'
-    show
-        AppContainer,
-        ContainerDebugExt,
-        FeatureDebugInfo,
-        FeatureDependency,
-        FeatureStatus,
-        PortDebugInfo,
-        Store;
+import 'package:armature/advanced.dart'
+    show ContainerDebugExt, FeatureDebugInfo, FeatureDependency, PortDebugInfo;
+import 'package:armature/armature.dart' show AppContainer, FeatureStatus, Store;
 import 'package:meta/meta.dart' show internal;
 
 /// Debug node for the overlay layout. Wraps [FeatureDebugInfo] with

@@ -1,3 +1,4 @@
+import 'package:armature/advanced.dart' show StateUpdateCallback;
 import 'package:armature/armature.dart';
 import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
