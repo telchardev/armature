@@ -11,12 +11,14 @@ typedef AnyPort = Port<dynamic, Object?, Function>;
 
 /// Base class for composable ports (pipes, behaviors, slots).
 ///
-/// A port collects handlers from child features. Subclasses fix
-/// `THandler` to their concrete handler-function type via a type-variable
-/// bound (`THandler extends PipeHandler<TValue>` etc.), so the handler
-/// map stays typed without per-call casts.
-///
-/// Owner is bound lazily on first [apply] call if not supplied via factory.
+/// Ports are **stateless across containers**. Handler registration,
+/// deregistration, and invocation all go through per-container maps
+/// owned by [AppContainer] (via `container.handlersOf<THandler>(port)`,
+/// `container.addPortHandler(...)`, etc.). The only mutable field on a
+/// port itself is [_owner], which is set once (either up front via the
+/// `feature:` constructor argument or lazily on the first apply) and
+/// never cleared — the ownership of a port is a property of the feature
+/// that declared it in `ports:`, stable for the lifetime of the process.
 ///
 /// **Handler invariants:**
 ///
@@ -42,40 +44,13 @@ abstract class Port<
 
   AnyFeature? _owner;
 
-  final Map<AnyFeature, THandler> _handlers = {};
-
   @internal
   Port({required this.name, required this.type, AnyFeature? owner})
     : _owner = owner;
 
-  /// Registers a [handler] from [feature] for this port.
-  ///
-  /// Throws [PortError] immediately if [feature] already has a handler
-  /// registered, or — when [_owner] is already bound — if [feature]
-  /// violates the owner/parent contract (`feature == _owner`, or the
-  /// port's owner is not in [feature]'s `dependsOn` / `optionalDependsOn`).
-  ///
-  /// When this port was constructed without an explicit `feature:`
-  /// argument (lazy-owner mode), owner/parent validation of
-  /// pre-registered handlers is **deferred** to the first [check] call;
-  /// see there for details.
-  @internal
-  void addHandler({required THandler handler, required AnyFeature feature}) {
-    if (_handlers[feature] != null) {
-      throw PortError(
-        name,
-        "Port \"$name\" already used in \"${feature.name}\" feature",
-      );
-    }
-
-    if (_owner != null) {
-      final error = _validateHandler(feature, candidateOwner: _owner!);
-      if (error != null) throw error;
-    }
-
-    _handlers[feature] = handler;
-  }
-
+  /// Applies this port against the handler set registered in [container]
+  /// for this port. Subclasses iterate `container.handlersOf<THandler>(this)`
+  /// to get the live map.
   @internal
   TValue apply({
     required TValue initialValue,
@@ -83,41 +58,40 @@ abstract class Port<
     required TInputData data,
   });
 
-  /// Validates that [applyingFeature] is allowed to apply this port.
+  /// Validates that [applyingFeature] is allowed to apply this port
+  /// against [container]'s handler registry.
   ///
   /// **Always returns, never throws.** Apply-time validation runs on
   /// every render (potentially per-frame), so a mis-scoped apply is
-  /// surfaced as a value — `AppContainer.apply` routes the returned
-  /// [PortError] through the container's `errorHandler` and falls back
-  /// to `initialValue` instead of crashing the build. Registration-time
-  /// validation ([addHandler]) still *throws* [PortError] — those are
-  /// programming errors that fire once, during feature construction.
+  /// surfaced as a value — callers route the returned [PortError] through
+  /// the container's `errorHandler` and fall back to `initialValue`
+  /// instead of crashing the build. Registration-time validation
+  /// ([validateOwnership]) *throws* [PortError] from
+  /// [AppContainer.addPortHandler] — those are programming errors that
+  /// fire once, during container construction / feature start.
   ///
   /// **Side effect**: the first successful call binds this port's
   /// owner to [applyingFeature] (when the port was constructed without
   /// an explicit `feature:` argument). Subsequent calls must use the
-  /// same feature; otherwise a [PortError] is returned. Use [Pipe] /
-  /// [Behavior] factories with an explicit `feature:` to avoid relying
-  /// on lazy binding.
+  /// same feature; otherwise a [PortError] is returned. Use
+  /// constructors with an explicit `feature:` to avoid relying on lazy
+  /// binding.
   ///
   /// **Deferred validation.** During the owner-binding step, every
-  /// handler that was registered while the owner was still unbound is
+  /// handler already registered against [container] for this port is
   /// revalidated against the candidate owner. If any pre-registered
   /// handler violates the owner/parent contract, this method returns
   /// that [PortError] **without binding the owner** — the port stays
   /// in lazy-bind mode so the next apply repeats validation from
-  /// scratch (possibly picking up a fix via hot-reload). The violating
-  /// handler is kept in the map but never executes, because `apply`
-  /// short-circuits whenever [check] returns a non-null error.
+  /// scratch.
   @internal
-  PortError? check({required AnyFeature applyingFeature}) {
+  PortError? check({
+    required AppContainer container,
+    required AnyFeature applyingFeature,
+  }) {
     if (_owner == null) {
-      // Validate every pre-registered handler against the candidate
-      // owner before committing the binding. If any violates, leave
-      // `_owner` null so a subsequent apply re-runs validation — this
-      // keeps the port observable-broken until the source is fixed,
-      // without silently executing misconfigured handlers.
-      for (final feature in _handlers.keys) {
+      final handlers = container.handlersOf(this);
+      for (final feature in handlers.keys) {
         final error = _validateHandler(
           feature,
           candidateOwner: applyingFeature,
@@ -138,6 +112,17 @@ abstract class Port<
         : null;
   }
 
+  /// Validates a feature for registration of a handler on this port.
+  /// Returns `null` when the registration is legal, otherwise a
+  /// [PortError] the caller can throw or route through `errorHandler`.
+  ///
+  /// Used by [AppContainer.addPortHandler] at feature-start time.
+  @internal
+  PortError? validateOwnership({required AnyFeature applyingFeature}) {
+    if (_owner == null) return null; // lazy-bind mode; check at apply time.
+    return _validateHandler(applyingFeature, candidateOwner: _owner!);
+  }
+
   @override
   Map<String, String> get debugInfo {
     return {
@@ -150,38 +135,9 @@ abstract class Port<
   @override
   String toString() => '${type.name}($name)';
 
-  /// Number of features that registered handlers for this port.
-  @internal
-  int get handlerCount => _handlers.length;
-
-  /// Names of features that registered handlers for this port.
-  @internal
-  List<String> get handlerFeatureNames =>
-      _handlers.keys.map((f) => f.name).toList();
-
-  @protected
-  @internal
-  Map<AnyFeature, THandler> get handlers => _handlers;
-
-  @internal
-  void removeHandler({required AnyFeature feature}) {
-    _handlers.remove(feature);
-  }
-
-  /// Framework-internal probe used by the feature-orchestrator's re-
-  /// registration path. Returns `true` when [feature] has a handler
-  /// currently registered on this port, and `false` otherwise —
-  /// including the window after [removeHandler] has run during a
-  /// previous container's teardown but before the next container's
-  /// construct phase has re-applied the feature's bindings.
-  @internal
-  bool hasHandlerFor(AnyFeature feature) => _handlers[feature] != null;
-
   /// Pure validator — returns the [PortError] that would be raised for
   /// [feature] against [candidateOwner], or `null` if the pairing is
-  /// legal. Used by [addHandler] (eager path: wraps the result in a
-  /// throw) and [check] (lazy-bind path: returns the result up the
-  /// stack without binding the owner).
+  /// legal.
   PortError? _validateHandler(
     AnyFeature feature, {
     required AnyFeature candidateOwner,

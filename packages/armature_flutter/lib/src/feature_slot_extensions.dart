@@ -1,5 +1,5 @@
 import 'package:armature/armature.dart'
-    show AnyFeature, Feature, FeatureHandlerContext, FeatureScopeApi;
+    show Feature, FeatureHandlerContext, FeatureScopeApi;
 import 'package:flutter/widgets.dart' show Widget;
 
 import './ports/multi_slot.dart'
@@ -13,6 +13,12 @@ import './ports/slot_descriptor.dart' show SlotLoaderBuilder;
 /// the widget into the framework-internal descriptor under the hood,
 /// so user code never types [SingleSlotDescriptor] /
 /// [MultiSlotDescriptor] explicitly.
+///
+/// Registration records the `(port, handler)` pairing into the
+/// feature's config. The actual installation into a container's port
+/// handler map happens during that container's `start()` —
+/// `FeatureOrchestrator` iterates each feature's `portBindings` and
+/// calls `container.addPortHandler(...)`.
 extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   /// Registers [handler] against a parent's [SingleSlot].
   ///
@@ -22,14 +28,11 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   /// abstain for that particular `data` payload; return a [Widget]
   /// to contribute it — the widget wins the slot if its [priority] is
   /// the highest among active contributors (ties go to the
-  /// first-registered handler; see [SingleSlot.apply]).
+  /// first-registered handler).
   ///
   /// [loader] overrides the renderer's default loader while this
   /// feature is `.pending` during a rebuild that would have selected
   /// this handler.
-  ///
-  /// Calling this twice on the same port / feature pair throws
-  /// [PortError] — one handler per feature per port.
   void useSingleSlot<TInputData>(
     SingleSlot<TInputData, SingleSlotHandler<TInputData>> slot,
     Widget? Function(TInputData data, FeatureScopeApi<TStores> api) handler, {
@@ -38,9 +41,9 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   }) {
     SingleSlotDescriptor? wrappedHandler(
       TInputData data,
-      FeatureHandlerContext _,
+      FeatureHandlerContext ctx,
     ) {
-      final widget = handler(data, internal.scopeApi);
+      final widget = handler(data, ctx as FeatureScopeApi<TStores>);
       if (widget == null) return null;
       return SingleSlotDescriptor(
         widget: widget,
@@ -49,9 +52,7 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
       );
     }
 
-    slot.addHandler(handler: wrappedHandler, feature: this as AnyFeature);
-    internal.usePort(port: slot);
-    internal.registerBinding(port: slot, handler: wrappedHandler);
+    recordPortBinding(slot, wrappedHandler);
   }
 
   /// Registers [handler] against a parent's [MultiSlot].
@@ -66,9 +67,6 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   ///
   /// [loader] overrides the renderer's default loader while this
   /// feature is `.pending`.
-  ///
-  /// Calling this twice on the same port / feature pair throws
-  /// [PortError] — one handler per feature per port.
   void useMultiSlot<TInputData>(
     MultiSlot<TInputData, MultiSlotHandler<TInputData>> slot,
     Widget? Function(TInputData data, FeatureScopeApi<TStores> api) handler, {
@@ -77,15 +75,13 @@ extension FeatureSlotExtensions<TStores> on Feature<TStores, dynamic, dynamic> {
   }) {
     MultiSlotDescriptor? wrappedHandler(
       TInputData data,
-      FeatureHandlerContext _,
+      FeatureHandlerContext ctx,
     ) {
-      final widget = handler(data, internal.scopeApi);
+      final widget = handler(data, ctx as FeatureScopeApi<TStores>);
       if (widget == null) return null;
       return MultiSlotDescriptor(widget: widget, order: order, loader: loader);
     }
 
-    slot.addHandler(handler: wrappedHandler, feature: this as AnyFeature);
-    internal.usePort(port: slot);
-    internal.registerBinding(port: slot, handler: wrappedHandler);
+    recordPortBinding(slot, wrappedHandler);
   }
 }

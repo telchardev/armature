@@ -8,7 +8,7 @@
 /// void main() {
 ///   test('my feature works', () async {
 ///     final container = await startedContainer(features: [myFeature]);
-///     final store = myFeature.storeOf<MyStore>();
+///     final store = myFeature.storeOf<MyStore>(container);
 ///     // ...
 ///   });
 /// }
@@ -100,11 +100,12 @@ extension FeatureTestExtensions<
   TPorts extends Object?
 >
     on Feature<TStores, TExports, TPorts> {
-  /// Typed lookup of a [Store] owned by this feature by its runtime type.
+  /// Typed lookup of a [Store] owned by this feature in [container].
   ///
-  /// Equivalent to `feature.internal.scopeApi.store<T>()` but without
-  /// reaching into `@internal` surface from user test code.
-  T storeOf<T extends Store>() {
-    return internal.scopeApi.store<T>();
+  /// Feature runtime state (including the scope API where stores live)
+  /// is per-container — you must tell the helper which container's
+  /// runtime to look in.
+  T storeOf<T extends Store>(AppContainer container) {
+    return container.runtimeOf(this).scopeApi.store<T>();
   }
 }

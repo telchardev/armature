@@ -1,5 +1,6 @@
 import 'dart:async' show Zone;
 import 'dart:collection' show UnmodifiableMapView;
+import 'dart:developer' show log;
 
 import 'package:armature_graph/armature_graph.dart'
     show
@@ -20,9 +21,11 @@ import '../errors.dart'
         FeatureResolutionReason,
         HandlerError,
         ListenerError,
+        PortError,
         RenderError;
 import '../feature/feature.dart' show AnyFeature, Feature;
 import '../feature/feature_api.dart' show FeatureHandlerContext;
+import '../feature/feature_runtime.dart' show FeatureRuntime;
 import '../feature/feature_status.dart' show FeatureStatus, ToggleState;
 import '../logger/logger.dart' show LogLevel, Logger;
 import '../logger/null_logger.dart' show NullLogger;
@@ -128,17 +131,24 @@ final class AppContainer {
   /// would otherwise leak silently.
   ///
   /// Attached in debug builds only (via `assert`), so production
-  /// behaviour is unchanged.
+  /// behaviour is unchanged. Routes through `dart:developer`'s `log`
+  /// so the message shows up in DevTools' log stream rather than as a
+  /// raw `print` — `log` is more appropriate for framework-level
+  /// diagnostics than `print` and doesn't need an `avoid_print` lint
+  /// suppression.
   static final Finalizer<String> _debugFinalizer = Finalizer((name) {
-    // ignore: avoid_print
-    print(
-      'WARN: $name was garbage-collected without dispose(). This may '
+    log(
+      '$name was garbage-collected without dispose(). This may '
       'indicate leaked timers, stream subscriptions, or stale port '
       'handlers. Call `container.dispose()` when done.',
+      name: 'armature.AppContainer',
+      level: 900, // WARNING per dart:developer convention.
     );
   });
 
-  /// Dependency graph. Used internally by debug overlay.
+  /// Raw dependency graph backing this container. Exposed for
+  /// framework-internal consumers (notably `ContainerDebugExt.debug`)
+  /// — application code should read through `debug` instead.
   @internal
   Graph<AnyFeature> get graph => _orchestrator.graph;
 
@@ -146,6 +156,19 @@ final class AppContainer {
 
   /// Deduplicated features in the caller's declaration order.
   final List<AnyFeature> _features;
+
+  /// Per-container feature runtime state. Populated at construction —
+  /// one fresh [FeatureRuntime] per declared feature per container —
+  /// and dropped wholesale on [dispose]. Two containers that share the
+  /// same top-level `final` feature instance hold independent entries
+  /// here, so async dispose of one cannot corrupt the other's state.
+  final Map<AnyFeature, FeatureRuntime> _runtimes = {};
+
+  /// Per-container port handler registry. Keyed by `port` → `feature`
+  /// → wrapped handler (erased to [Function]; concrete types are
+  /// reconstituted inside each [Port] subclass via a per-entry cast).
+  /// Cleared on dispose — no cross-container handler leakage.
+  final Map<AnyPort, Map<AnyFeature, Function>> _portHandlers = {};
 
   final Map<String, Duration> _resolveTimes = {};
 
@@ -177,6 +200,12 @@ final class AppContainer {
        _logger = logger ?? NullLogger() {
     _events = Events(reportListenerError: _reportListenerError);
     _orchestrator = FeatureOrchestrator(host: this, features: _features);
+    // Allocate a fresh runtime for every feature this container owns.
+    // The next container built with the same features gets its own
+    // independent set of runtimes.
+    for (final f in _features) {
+      _runtimes[f] = FeatureRuntime(feature: f, container: this);
+    }
     assert(() {
       _debugFinalizer.attach(
         this,
@@ -329,19 +358,13 @@ final class AppContainer {
   Future<void> _teardownFeatures({required bool forRestart}) async {
     await _orchestrator.teardown();
 
-    if (!forRestart) {
-      // Full dispose: strip port handlers (prevents top-level ports from
-      // pinning feature instances after the container dies) and dispose
-      // container-scoped events. On rollback, keep both alive — the
-      // next start() retry reuses the same feature instances and the
-      // original `..usePipe(...)` registration order, and outside
-      // subscribers still observe the live container.
-      for (final feature in _features) {
-        for (final port in feature.internal.ports) {
-          port.removeHandler(feature: feature);
-        }
-      }
-    }
+    // Drop every handler contributed to any port this container
+    // installed. Since `_portHandlers` is container-scoped, other
+    // containers sharing the same top-level ports are unaffected.
+    // On rollback we also clear — the next start() retry re-installs
+    // handlers from each feature's recorded `portBindings` via the
+    // orchestrator's install-port-handlers step.
+    _portHandlers.clear();
 
     _resolveTimes.clear();
 
@@ -371,7 +394,7 @@ final class AppContainer {
       );
     }
 
-    final error = port.check(applyingFeature: rootFeature);
+    final error = port.check(container: this, applyingFeature: rootFeature);
 
     if (error != null) {
       _callErrorHandler(source: rootFeature.name, error: error, meta: {});
@@ -421,7 +444,7 @@ final class AppContainer {
       );
     }
 
-    final error = port.check(applyingFeature: rootFeature);
+    final error = port.check(container: this, applyingFeature: rootFeature);
     if (error != null) {
       // Mis-scoped apply: report the error and return a "dead"
       // subscription pinned at [initialValue]. The port's owner never
@@ -585,7 +608,70 @@ final class AppContainer {
   /// rolled-back start.
   @internal
   FeatureHandlerContext handlerContextFor(Feature feature) {
-    return feature.internal.scopeApi;
+    return runtimeOf(feature).scopeApi;
+  }
+
+  /// Returns this container's [FeatureRuntime] for [feature]. Throws
+  /// [ContainerUsageError] if the feature was not registered on this
+  /// container.
+  @internal
+  FeatureRuntime runtimeOf(AnyFeature feature) {
+    final r = _runtimes[feature];
+    if (r == null) {
+      throw ContainerUsageError(
+        'Feature "${feature.name}" is not registered on this AppContainer.',
+      );
+    }
+    return r;
+  }
+
+  /// Returns the map of (feature → handler) for [port] as seen by this
+  /// container. Handlers are erased to [Function]; concrete port
+  /// subclasses cast per-entry at the call site (cheaper than a
+  /// map-level `.cast()` wrapper, which re-checks types on every
+  /// read). Returns an empty const map when no handler is installed.
+  /// Callers must not mutate — use [addPortHandler] / [removePortHandler].
+  @internal
+  Map<AnyFeature, Function> handlersOf(AnyPort port) {
+    return _portHandlers[port] ?? const {};
+  }
+
+  /// Installs [handler] for [feature] on [port] in this container's
+  /// handler map. Throws [PortError] if [feature] already has a handler
+  /// on [port] in this container.
+  @internal
+  void addPortHandler({
+    required AnyPort port,
+    required AnyFeature feature,
+    required Function handler,
+  }) {
+    final map = _portHandlers.putIfAbsent(port, () => {});
+    if (map.containsKey(feature)) {
+      throw PortError(
+        port.name,
+        'Port "${port.name}" already used in "${feature.name}" feature',
+      );
+    }
+    final error = port.validateOwnership(applyingFeature: feature);
+    if (error != null) throw error;
+    map[feature] = handler;
+  }
+
+  /// Removes [feature]'s handler from [port] in this container's
+  /// handler map. No-op if no such handler is installed.
+  @internal
+  void removePortHandler({required AnyPort port, required AnyFeature feature}) {
+    final map = _portHandlers[port];
+    if (map == null) return;
+    map.remove(feature);
+    if (map.isEmpty) _portHandlers.remove(port);
+  }
+
+  /// Whether [feature] has a handler installed on [port] in this
+  /// container.
+  @internal
+  bool hasPortHandlerFor({required AnyPort port, required AnyFeature feature}) {
+    return _portHandlers[port]?.containsKey(feature) ?? false;
   }
 
   /// Sets [feature]'s own activation preference from outside an

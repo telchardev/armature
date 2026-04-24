@@ -7,11 +7,13 @@ import '../port/port_type.dart' show PortType;
 import '../store/store.dart' show Store;
 import './container.dart' show AppContainer, ContainerStatus;
 
-/// Structured, read-only snapshot of a [AppContainer] for debug tooling.
+/// Structured, read-only snapshot of an [AppContainer] for debug tooling.
 ///
-/// Returned by [AppContainer.debug]. Decouples debug/inspection consumers
-/// (such as the `armature_flutter` graph overlay) from the container's
-/// `@internal` surface.
+/// Returned by [AppContainer.debug]. Decouples debug/inspection
+/// consumers (such as the `armature_flutter` graph overlay) from the
+/// container's framework-internal fields — they read a plain data
+/// snapshot instead of reaching into runtime state, ports, or the
+/// orchestrator directly.
 class ContainerDebug {
   /// Features in topological order — parents before children.
   final List<FeatureDebugInfo> features;
@@ -116,18 +118,17 @@ extension ContainerDebugExt on AppContainer {
     ];
 
     final ports = [
-      for (final p in feature.internal.ports)
+      for (final p in feature.config.ports)
         PortDebugInfo(
           name: p.name,
           type: p.type,
-          handlerCount: p.handlerCount,
-          handlerFeatureNames: p.handlerFeatureNames,
+          handlerCount: handlersOf(p).length,
+          handlerFeatureNames: [for (final f in handlersOf(p).keys) f.name],
         ),
     ];
 
-    final scopeApi = feature.internal.isResolved
-        ? feature.internal.scopeApi
-        : null;
+    final runtime = runtimeOf(feature);
+    final scopeApi = runtime.isResolved ? runtime.scopeApi : null;
 
     return FeatureDebugInfo(
       name: feature.name,

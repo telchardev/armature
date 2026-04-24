@@ -13,8 +13,6 @@ class _CounterStore extends Store<int> {
 enum _TestBranch { a, b }
 
 void main() {
-  setUpAll(initTestRenderer);
-
   group('PipeProvider', () {
     testWidgets('renders pipe value', (tester) async {
       final rootFeature = createFeature(name: "root");
@@ -60,7 +58,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counterService = rootFeature.storeOf<_CounterStore>();
+      final counterService = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,
@@ -212,7 +210,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counterService = rootFeature.storeOf<_CounterStore>();
+      final counterService = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,

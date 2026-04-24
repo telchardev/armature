@@ -5,8 +5,6 @@ import 'package:flutter/widgets.dart' show SizedBox, Text, Widget;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  setUpAll(initTestRenderer);
-
   group('createSingleSlot', () {
     test('returns null when no handlers registered', () async {
       final rootFeature = createFeature(name: "root");
@@ -16,6 +14,7 @@ void main() {
       );
 
       final container = await startedContainer(features: [rootFeature]);
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -43,6 +42,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -77,6 +77,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, lowPriority, highPriority],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -105,6 +106,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, disabledFeature],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -135,6 +137,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
+      initTestRenderer(container);
 
       container.apply(
         rootFeature: rootFeature,
@@ -162,6 +165,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -195,7 +199,8 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final toggleService = rootFeature.storeOf<_ToggleStore>();
+      initTestRenderer(container);
+      final toggleService = rootFeature.storeOf<_ToggleStore>(container);
 
       // Initially false → null
       var result = container.apply(
@@ -240,6 +245,7 @@ void main() {
       );
 
       final container = await startedContainer(features: [rootFeature]);
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -274,6 +280,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, featureA, featureB],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -308,6 +315,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, visibleFeature, hiddenFeature],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,
@@ -348,7 +356,8 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, alwaysFeature, conditionalFeature],
       );
-      final toggleService = rootFeature.storeOf<_ToggleStore>();
+      initTestRenderer(container);
+      final toggleService = rootFeature.storeOf<_ToggleStore>(container);
 
       // Initially false → only 1 widget
       var result = container.apply(
@@ -406,6 +415,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, enabledFeature, disabledFeature],
       );
+      initTestRenderer(container);
 
       final result = container.apply(
         rootFeature: rootFeature,

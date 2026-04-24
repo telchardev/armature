@@ -41,9 +41,6 @@ class State<TState> {
   /// Creates a holder with the given initial [state].
   State({required TState state}) : _state = state;
 
-  /// Number of active listeners on this state.
-  int get listenerCount => _changeStateListeners.length;
-
   /// Current state. Reading inside a reaction-tracked scope
   /// (e.g. a port handler body) registers the enclosing reaction as
   /// an observer — subsequent writes will invalidate it.
@@ -123,13 +120,19 @@ class State<TState> {
 
   /// Fires change listeners in registration order.
   ///
-  /// Iterates a defensive snapshot of the subscriber set so listeners
-  /// are free to subscribe / unsubscribe to this [State] during their
-  /// own invocation (e.g. classic one-shot listener pattern). The
-  /// snapshot is only built when at least one listener is registered,
-  /// so quiet states allocate nothing.
+  /// Allocation policy: for the single-listener case (the overwhelmingly
+  /// common shape in practice — one `StateObserver`, one subscriber)
+  /// we skip the defensive snapshot and call the listener directly.
+  /// Multi-listener states iterate a snapshot so listeners are free
+  /// to subscribe / unsubscribe during their own invocation (classic
+  /// one-shot listener pattern).
   void _notifyListeners(TState prevState, TState state) {
-    if (_changeStateListeners.isEmpty) return;
+    final count = _changeStateListeners.length;
+    if (count == 0) return;
+    if (count == 1) {
+      _changeStateListeners.first(prevState, state);
+      return;
+    }
     for (final listener in _changeStateListeners.toList(growable: false)) {
       listener(prevState, state);
     }

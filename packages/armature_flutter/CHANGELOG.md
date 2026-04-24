@@ -1,3 +1,38 @@
+## 0.3.0
+
+### Fixed
+
+- **Per-container renderer** — the pre-0.3.0 `rendererContext` global
+  singleton has been replaced by a per-`AppContainer` renderer slot,
+  accessed via the new `ContainerRenderer` extension
+  (`container.renderer`). Two `ArmatureApp`s living sibling-by-sibling
+  or mounting / unmounting in rapid succession each carry their own
+  renderer — the previous race where an outgoing widget's async
+  dispose nulled out the incoming widget's renderer is gone.
+
+### BREAKING (internal)
+
+- `rendererContext` global removed. `ArmatureApp.initState` and
+  `bootstrap()` now call `container.setRenderer(...)` instead of
+  assigning the global. Custom renderers and slot implementations read
+  via `container.renderer`.
+- `initTestRenderer` in `test_utils.dart` now takes an `AppContainer`:
+  `initTestRenderer(container)`. `pumpFeature` installs a
+  `FlutterRenderer` lazily on each container, so most widget tests
+  don't need to call `initTestRenderer` directly anymore.
+- `useSingleSlot` / `useMultiSlot` extensions record the binding into
+  the feature's config (via the new internal `Feature.recordPortBinding`
+  helper) instead of calling `port.addHandler`. User-facing API is
+  unchanged.
+- Slot widget builders use `container.renderer.renderSlot(...)` instead
+  of `rendererContext.renderer.renderSlot(...)`. The `container` is
+  available at every existing call site — no extra plumbing needed.
+
+### Depends on
+
+- `armature: ^0.3.0` — see that package's CHANGELOG for the full
+  config/runtime split.
+
 ## 0.2.0
 
 > Note: This release has breaking changes.

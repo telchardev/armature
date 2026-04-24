@@ -60,10 +60,12 @@ class Behavior<
     BehaviorDescriptor<TBranch, TPayload>? result;
     int maxPriority = 0;
 
+    final handlers = container.handlersOf(this);
     for (final MapEntry(:key, :value) in handlers.entries) {
       if (container.statusOf(key) != FeatureStatus.active) continue;
 
-      final descriptor = value(container.handlerContextFor(key));
+      final handler = value as BehaviorHandler<TBranch, TPayload>;
+      final descriptor = handler(container.handlerContextFor(key));
       if (descriptor == null) continue;
 
       if (result != null && descriptor.priority <= maxPriority) continue;

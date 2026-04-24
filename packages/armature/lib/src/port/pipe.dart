@@ -32,9 +32,11 @@ class Pipe<TValue extends Object, THandler extends PipeHandler<TValue>>
   }) {
     TValue resultValue = initialValue;
 
+    final handlers = container.handlersOf(this);
     for (final MapEntry(:key, :value) in handlers.entries) {
       if (container.statusOf(key) == FeatureStatus.active) {
-        resultValue = value(resultValue, container.handlerContextFor(key));
+        final handler = value as PipeHandler<TValue>;
+        resultValue = handler(resultValue, container.handlerContextFor(key));
       }
     }
 

@@ -63,8 +63,8 @@ Large Flutter applications quickly become a tangled mess of providers, singleton
 ```yaml
 # pubspec.yaml
 dependencies:
-  armature: ^0.1.0
-  armature_flutter: ^0.1.0
+  armature: ^0.3.0
+  armature_flutter: ^0.3.0
 ```
 
 ### 2. Define a feature
@@ -506,12 +506,13 @@ await container.dispose();
 
 ### Internal API boundary
 
-Symbols annotated `@internal` (e.g. `AppContainer.graph`, `Feature.internal`,
-`Port.addHandler`) and files under `package:armature/src/...` are framework
-plumbing. Triggering lint warnings (`invalid_use_of_internal_member`,
-`implementation_imports`) signals you're reaching into an unstable surface
-and may break on upgrade. Use only the public API exported from
-`package:armature/armature.dart`.
+Symbols annotated `@internal` (e.g. `AppContainer.graph`,
+`AppContainer.runtimeOf`, `AppContainer.handlersOf`, `Feature.config`)
+and files under `package:armature/src/...` are framework plumbing.
+Triggering lint warnings (`invalid_use_of_internal_member`,
+`implementation_imports`) signals you're reaching into an unstable
+surface and may break on upgrade. Use only the public API exported
+from `package:armature/armature.dart`.
 
 ---
 
@@ -559,8 +560,8 @@ No API keys, no network — everything is in-process except the two `SharedPrefe
 
 | Package | Version | Dart SDK | Description |
 |---------|---------|----------|-------------|
-| [`armature`](https://pub.dev/packages/armature) | 0.1.0 | `^3.9.0` | Core framework — features, stores, tasks, ports |
-| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.1.0 | `^3.9.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
+| [`armature`](https://pub.dev/packages/armature) | 0.3.0 | `^3.9.0` | Core framework — features, stores, tasks, ports |
+| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.3.0 | `^3.9.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
 | [`armature_reactive`](https://pub.dev/packages/armature_reactive) | 0.1.0 | `^3.9.0` | Reactive primitives — `Atom`, `Reaction` |
 | [`armature_graph`](https://pub.dev/packages/armature_graph) | 0.1.0 | `^3.9.0` | DAG resolver — topological ordering, visitor |
 

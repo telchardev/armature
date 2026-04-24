@@ -488,4 +488,46 @@ void main() {
       expect(results, equals([1, 1, 1]));
     });
   });
+
+  group('TaskState sealed hierarchy', () {
+    test('variants use value equality (stable listener notifies)', () {
+      const a = TaskIdle<int, String, Object>();
+      const b = TaskIdle<int, String, Object>();
+      expect(a, equals(b));
+
+      const p1 = TaskPending<int, String, Object>(42);
+      const p2 = TaskPending<int, String, Object>(42);
+      const p3 = TaskPending<int, String, Object>(43);
+      expect(p1, equals(p2));
+      expect(p1, isNot(equals(p3)));
+
+      const d1 = TaskDone<int, String, Object>('ok');
+      const d2 = TaskDone<int, String, Object>('ok');
+      const d3 = TaskDone<int, String, Object>('nope');
+      expect(d1, equals(d2));
+      expect(d1, isNot(equals(d3)));
+    });
+
+    test('pattern-matching on Task.state exercises every variant', () async {
+      final task = makeTask<int, int>(
+        fn: (p) async => p * 2,
+        strategy: TaskStrategy.once,
+      );
+
+      String label(TaskState<int, int, Object> s) => switch (s) {
+        TaskIdle() => 'idle',
+        TaskPending(:final params) => 'pending($params)',
+        TaskDone(:final result) => 'done($result)',
+        TaskFailed(:final error) => 'failed($error)',
+      };
+
+      expect(label(task.state), equals('idle'));
+
+      final future = task(7);
+      expect(label(task.state), equals('pending(7)'));
+
+      await future;
+      expect(label(task.state), equals('done(14)'));
+    });
+  });
 }

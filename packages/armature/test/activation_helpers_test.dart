@@ -44,7 +44,7 @@ void main() {
           );
 
         final container = await startedContainer(features: [parent, child]);
-        final toggleStore = parent.storeOf<_ToggleStore>();
+        final toggleStore = parent.storeOf<_ToggleStore>(container);
 
         // Initially false → child stays disabled.
         expect(container.statusOf(child), equals(FeatureStatus.disabled));
@@ -105,7 +105,7 @@ void main() {
         );
         await container.start();
 
-        final toggleStore = parent.storeOf<_ToggleStore>();
+        final toggleStore = parent.storeOf<_ToggleStore>(container);
         // Dispose — should run cleanup bag, unsubscribing from toggleStore.
         await container.dispose();
 

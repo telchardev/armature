@@ -5,7 +5,7 @@ import 'package:meta/meta.dart' show internal;
 
 import './contexts/container_context.dart' show ContainerContext;
 import './ports/slot_descriptor.dart' show SlotDescriptor, SlotLoaderBuilder;
-import './renderer/renderer_context.dart' show rendererContext;
+import './renderer/renderer_context.dart' show ContainerRenderer;
 
 /// Widget that mounts [feature] as a top-level root inside the
 /// container: looks up the live [AppContainer] via [ContainerContext]
@@ -17,14 +17,10 @@ import './renderer/renderer_context.dart' show rendererContext;
 class FeatureRoot<TInputData extends Object?> extends StatelessWidget {
   final TInputData data;
 
-  /// Widget to render once [feature] is active. Shown after the
-  /// container reaches `.working` and this feature's `onStart` has
-  /// completed.
+  /// Widget to render once [feature] is active.
   final Widget widget;
 
-  /// Optional loader shown while [feature] is still `.pending` (or
-  /// while the container is still `.starting`). Falls back to the
-  /// renderer's default loader (or empty space) when omitted.
+  /// Optional loader shown while [feature] is still `.pending`.
   final SlotLoaderBuilder? loader;
 
   final armature.Feature feature;
@@ -42,9 +38,7 @@ class FeatureRoot<TInputData extends Object?> extends StatelessWidget {
   }
 
   /// Internal: projects the root's widget + loader onto a
-  /// [SlotDescriptor] for the renderer's typed slot pipeline. Kept
-  /// private to the framework — end users never construct descriptors
-  /// for roots now that [createFeatureRoot] accepts `widget:` directly.
+  /// [SlotDescriptor] for the renderer's typed slot pipeline.
   @internal
   SlotDescriptor get descriptor =>
       SlotDescriptor(widget: widget, loader: loader);
@@ -60,7 +54,7 @@ class FeatureRoot<TInputData extends Object?> extends StatelessWidget {
       return true;
     }());
 
-    return rendererContext.renderer.renderSlot(
+    return container.renderer.renderSlot(
       container: container,
       feature: feature,
       descriptor: descriptor,
@@ -76,23 +70,7 @@ typedef FeatureRootBuilder<TInputData> =
     Widget Function({required TInputData data});
 
 /// Binds [feature] and its root [widget] (plus optional [loader]) into
-/// a reusable [FeatureRootBuilder]. The returned builder takes the
-/// per-render `data` payload and produces the [FeatureRoot] widget.
-///
-/// ```dart
-/// final layoutRoot = createFeatureRoot<LayoutInput>(
-///   feature: layoutFeature,
-///   widget: const LayoutShell(),
-/// );
-/// ...
-/// runApp(ArmatureApp(
-///   features: [layoutFeature],
-///   child: layoutRoot(data: LayoutInput(mode: .tablet)),
-/// ));
-/// ```
-///
-/// Supply [loader] when the root should render something while the
-/// feature is `.pending` (e.g. a splash screen during async `onStart`).
+/// a reusable [FeatureRootBuilder].
 FeatureRootBuilder<TInputData> createFeatureRoot<TInputData extends Object?>({
   required armature.Feature feature,
   required Widget widget,

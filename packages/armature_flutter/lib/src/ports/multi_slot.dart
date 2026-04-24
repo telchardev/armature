@@ -4,7 +4,7 @@ import 'package:armature/armature.dart'
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:meta/meta.dart' show internal;
 
-import '../renderer/renderer_context.dart' show rendererContext;
+import '../renderer/renderer_context.dart' show ContainerRenderer;
 import './slot_descriptor.dart' show SlotDescriptor;
 
 /// Sort direction for [MultiSlot] contributions, keyed off
@@ -44,13 +44,6 @@ typedef MultiSlotHandler<TInputData> =
 /// Port that collects contributions from every active feature and
 /// renders **all** of them as a list, sorted by
 /// [MultiSlotDescriptor.order] in [orderDirection].
-///
-/// `apply` walks every registered handler in registration order,
-/// skipping handlers from inactive features and handlers that return
-/// `null`. The surviving descriptors are rendered and their widgets
-/// sorted in place; the final list is returned as the slot's value
-/// (appended to `initialValue`, so the caller can seed a header /
-/// placeholder widget).
 class MultiSlot<
   TInputData extends Object?,
   THandler extends MultiSlotHandler<TInputData>
@@ -69,15 +62,14 @@ class MultiSlot<
     required AppContainer container,
     required TInputData data,
   }) {
-    // Accumulate as `(order, widget)` records, sort in place, then
-    // append to a single growable List. Avoids the previous tuple
-    // list + spread+map literal, which allocated two lists per apply.
     final entries = <({int order, Widget widget})>[];
 
+    final handlers = container.handlersOf(this);
     for (final MapEntry(:key, :value) in handlers.entries) {
       if (container.statusOf(key) != FeatureStatus.active) continue;
 
-      final descriptor = value(data, container.handlerContextFor(key));
+      final handler = value as MultiSlotHandler<TInputData>;
+      final descriptor = handler(data, container.handlerContextFor(key));
       if (descriptor == null) continue;
 
       Map<String, String>? debugInfo;
@@ -87,7 +79,7 @@ class MultiSlot<
         return true;
       }());
 
-      final widget = rendererContext.renderer.renderSlot(
+      final widget = container.renderer.renderSlot(
         container: container,
         feature: key,
         descriptor: descriptor,

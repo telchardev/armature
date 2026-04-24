@@ -20,8 +20,8 @@ dependencies, eager store construction, and extension points
 
 ```yaml
 dependencies:
-  armature: ^0.2.0
-  armature_flutter: ^0.2.0   # if you want the Flutter integration
+  armature: ^0.3.0
+  armature_flutter: ^0.3.0   # if you want the Flutter integration
 ```
 
 ## Quickstart

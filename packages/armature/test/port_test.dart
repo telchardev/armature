@@ -3,20 +3,28 @@ import 'package:test/test.dart';
 
 void main() {
   group('Port metadata', () {
-    test('handlerCount reflects registered handlers', () {
-      final owner = createFeature(name: "owner");
-      final pipe = createPipe<int>(name: "p", feature: owner);
-      final child1 = createFeature(name: "c1", dependsOn: [owner])
-        ..usePipe(pipe, (v, _) => v + 1);
-      final child2 = createFeature(name: "c2", dependsOn: [owner])
-        ..usePipe(pipe, (v, _) => v + 2);
+    test(
+      'handler set for a port is populated in the container map after start',
+      () async {
+        final owner = createFeature(name: "owner");
+        final pipe = createPipe<int>(name: "p", feature: owner);
+        final child1 = createFeature(name: "c1", dependsOn: [owner])
+          ..usePipe(pipe, (v, _) => v + 1);
+        final child2 = createFeature(name: "c2", dependsOn: [owner])
+          ..usePipe(pipe, (v, _) => v + 2);
 
-      expect(pipe.handlerCount, equals(2));
-      expect(
-        pipe.handlerFeatureNames.toSet(),
-        equals({child1.name, child2.name}),
-      );
-    });
+        final container = AppContainer(features: [owner, child1, child2]);
+        addTearDown(container.dispose);
+        await container.start();
+
+        final handlers = container.handlersOf(pipe);
+        expect(handlers.length, equals(2));
+        expect(
+          handlers.keys.map((f) => f.name).toSet(),
+          equals({child1.name, child2.name}),
+        );
+      },
+    );
 
     test('debugInfo exposes name, type, and owner', () {
       final owner = createFeature(name: "owner");

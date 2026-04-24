@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import '../container/container.dart' show AppContainer;
 import '../errors.dart'
     show FeatureResolutionError, FeatureResolutionReason, StoreLookupError;
 import '../store/store.dart' show Store;
@@ -23,60 +24,45 @@ typedef StoresFactory<TStores> = TStores Function(FeatureParentApi parentApi);
 typedef ExportsFactory<TStores, TExports> =
     TExports Function(FeatureScopeApi<TStores> api);
 
-/// Provides typed access to parent feature stores.
+/// Provides typed access to parent feature stores for a specific
+/// [AppContainer].
+///
+/// Each container gets its own [FeatureParentApi] per feature (allocated
+/// by that container's [FeatureRuntime]) — so `parentApi.of(x)` resolves
+/// through the same container's runtime for `x`, never leaking into
+/// another container's state.
 class FeatureParentApi {
+  final AppContainer _container;
   final Set<AnyFeature> _requiredParents;
   final Set<AnyFeature> _optionalParents;
 
-  @internal
-  FeatureParentApi({
+  FeatureParentApi._({
+    required AppContainer container,
     required Set<AnyFeature> requiredParents,
     required Set<AnyFeature> optionalParents,
-  }) : _requiredParents = requiredParents,
+  }) : _container = container,
+       _requiredParents = requiredParents,
        _optionalParents = optionalParents;
 
   /// Returns typed exports of a declared parent [feature] — either
   /// required (`dependsOn`) or optional (`optionalDependsOn`).
   ///
-  /// The value is whatever the parent's `exports:` factory returned, not
-  /// the raw stores record. Features without custom exports (stateless)
-  /// or with `exports: (api) => api.own` expose the stores directly.
-  ///
-  /// Always succeeds for a declared parent: the container's construct
-  /// phase runs every feature's factory in topological order before
-  /// any setup / handler executes, and a factory throw aborts
-  /// `AppContainer.start()` wholesale (fail-fast). So by the time user
-  /// code can call this method, every declared parent has a valid
-  /// `scopeApi` and its exports are reachable.
-  ///
   /// Throws [FeatureResolutionError] with reason
   /// [FeatureResolutionReason.notDeclaredParent] if [feature] is not in
   /// the caller's `dependsOn` or `optionalDependsOn` list.
-  ///
-  /// **Activation vs construction.** This method doesn't care whether
-  /// [feature] is currently active — an optional parent may sit in
-  /// `.disabled` state but its exports are still reachable. Check
-  /// `container.statusOf(feature)` separately when liveness matters.
   TExports of<TExports>(Feature<dynamic, TExports, dynamic> feature) {
     _ensureDeclaredParent(feature);
-    return feature.internal.exports;
+    return _container.runtimeOf(feature).exports as TExports;
   }
 
   /// Returns a reactive [Store] mirroring the declared parent
-  /// [feature]'s current [FeatureStatus].
+  /// [feature]'s current [FeatureStatus] **for this container**.
   ///
-  /// Reads inside a reaction-tracked scope (e.g. a port handler body)
-  /// subscribe the enclosing reaction — transitions fire automatic
-  /// re-evaluation. Imperative callers can also `.subscribe(...)` /
-  /// read `.state` one-shot.
-  ///
-  /// Throws [FeatureResolutionError] with reason
-  /// [FeatureResolutionReason.notDeclaredParent] if [feature] is not in
-  /// the caller's `dependsOn` or `optionalDependsOn` list — consistent
-  /// with the discipline around [of].
+  /// Reads inside a reaction-tracked scope subscribe the enclosing
+  /// reaction — transitions fire automatic re-evaluation.
   Store<FeatureStatus> statusOf(AnyFeature feature) {
     _ensureDeclaredParent(feature);
-    return feature.internal.statusStore;
+    return _container.runtimeOf(feature).statusStore;
   }
 
   /// Shared guard for [of] / [statusOf]. Throws
@@ -95,14 +81,34 @@ class FeatureParentApi {
   }
 }
 
+/// Framework-only factory for a container-scoped [FeatureParentApi].
+/// Used by [FeatureRuntime]; not for application code.
+@internal
+FeatureParentApi featureParentApiForContainer({
+  required AppContainer container,
+  required Set<AnyFeature> requiredParents,
+  required Set<AnyFeature> optionalParents,
+}) => FeatureParentApi._(
+  container: container,
+  requiredParents: requiredParents,
+  optionalParents: optionalParents,
+);
+
 /// Context passed to port handlers (`usePipe` / `useBehavior` /
 /// slot handlers). Exposes the feature's own stores plus a
-/// [parent] accessor for declared parent stores.
+/// [parent] accessor for declared parent stores and a [container]
+/// reference for framework-internal plumbing.
 ///
 /// The typed subclass [FeatureScopeApi] is what `onStart` and
 /// activation `setup` receive — prefer its `.own` accessor for typed
 /// access to this feature's stores.
 class FeatureHandlerContext {
+  /// The container that owns this context. Framework-internal: used by
+  /// custom [Port] implementations that need to look up feature
+  /// runtimes. User code should not read this.
+  @internal
+  final AppContainer container;
+
   /// Typed accessor for any declared parent feature's stores via
   /// `parent.of(parentFeature)`. See [FeatureParentApi].
   final FeatureParentApi parent;
@@ -122,6 +128,7 @@ class FeatureHandlerContext {
 
   @internal
   FeatureHandlerContext({
+    required this.container,
     required this.parent,
     this.stores,
     this.storeMap = const {},
@@ -173,20 +180,11 @@ class FeatureHandlerContext {
 /// accessor; [parent] / `.of()` / `.store<T>()` are inherited.
 class FeatureScopeApi<TStores> extends FeatureHandlerContext {
   /// This feature's own typed stores record.
-  ///
-  /// ```dart
-  /// final feature = createFeature(
-  ///   name: "notes",
-  ///   stores: (_) => (repo: NotesStore(), counter: CounterStore()),
-  /// )..onStart((api, cleanup) async {
-  ///   await api.own.repo.loadAll();
-  ///   api.own.counter.increment();
-  /// });
-  /// ```
   TStores get own => stores as TStores;
 
   @internal
   FeatureScopeApi({
+    required super.container,
     required TStores super.stores,
     required super.parent,
     super.storeMap,

@@ -64,18 +64,6 @@ void main() {
       expect(() => emitter.remove('unknown', () {}), returnsNormally);
     });
 
-    test('hasListeners reflects add/remove', () {
-      final emitter = _emitter<String>();
-      expect(emitter.hasListeners('event'), isFalse);
-
-      void listener() {}
-      emitter.add('event', listener);
-      expect(emitter.hasListeners('event'), isTrue);
-
-      emitter.remove('event', listener);
-      expect(emitter.hasListeners('event'), isFalse);
-    });
-
     test('listener may remove itself during emit (one-shot pattern)', () {
       final emitter = _emitter<String>();
       var calls = 0;
@@ -89,7 +77,6 @@ void main() {
       // First emit: listener fires, removes itself.
       emitter.emit('event');
       expect(calls, equals(1));
-      expect(emitter.hasListeners('event'), isFalse);
 
       // Second emit: listener is gone, nothing fires.
       emitter.emit('event');
@@ -151,7 +138,6 @@ void main() {
       emitter.emit('event');
 
       expect(calls, equals(0));
-      expect(emitter.hasListeners('event'), isFalse);
     });
   });
 }

@@ -4,7 +4,7 @@ import 'package:armature/armature.dart'
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:meta/meta.dart' show internal;
 
-import '../renderer/renderer_context.dart' show rendererContext;
+import '../renderer/renderer_context.dart' show ContainerRenderer;
 import './slot_descriptor.dart' show SlotDescriptor;
 
 /// Framework-internal descriptor returned by a [SingleSlot] handler —
@@ -65,10 +65,12 @@ class SingleSlot<
     SingleSlotDescriptor? resultDescriptor;
     Feature? resultFeature;
 
+    final handlers = container.handlersOf(this);
     for (final MapEntry(:key, :value) in handlers.entries) {
       if (container.statusOf(key) != FeatureStatus.active) continue;
 
-      final descriptor = value(data, container.handlerContextFor(key));
+      final handler = value as SingleSlotHandler<TInputData>;
+      final descriptor = handler(data, container.handlerContextFor(key));
       if (descriptor == null) continue;
 
       if (resultDescriptor != null &&
@@ -88,7 +90,7 @@ class SingleSlot<
         return true;
       }());
 
-      return rendererContext.renderer.renderSlot(
+      return container.renderer.renderSlot(
         container: container,
         feature: resultFeature,
         descriptor: resultDescriptor,

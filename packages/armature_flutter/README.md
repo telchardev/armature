@@ -13,8 +13,8 @@ feature-graph debug overlay.
 
 ```yaml
 dependencies:
-  armature: ^0.2.0
-  armature_flutter: ^0.2.0
+  armature: ^0.3.0
+  armature_flutter: ^0.3.0
 ```
 
 ## Quickstart
@@ -153,10 +153,12 @@ import 'package:armature_flutter/test_utils.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  setUpAll(initTestRenderer);
-
   testWidgets('renders counter', (tester) async {
     final container = await startedContainer(features: [counterFeature]);
+    // pumpFeature auto-installs a FlutterRenderer on the container if
+    // none is set yet. For containers built outside ArmatureApp, call
+    // initTestRenderer(container) explicitly only if you need a custom
+    // FlutterRendererOptions.
     await pumpFeature(
       tester,
       container: container,

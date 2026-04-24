@@ -14,8 +14,6 @@ class _CounterStore extends Store<int> {
 }
 
 void main() {
-  setUpAll(initTestRenderer);
-
   group('MultiPortBuilder', () {
     testWidgets('reads a single port and rebuilds on reactive state change', (
       tester,
@@ -36,7 +34,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counter = rootFeature.storeOf<_CounterStore>();
+      final counter = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,
@@ -79,7 +77,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counter = rootFeature.storeOf<_CounterStore>();
+      final counter = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,
@@ -126,7 +124,7 @@ void main() {
         final container = await startedContainer(
           features: [rootFeature, childFeature],
         );
-        final counter = rootFeature.storeOf<_CounterStore>();
+        final counter = rootFeature.storeOf<_CounterStore>(container);
 
         await pumpFeature(
           tester,
@@ -206,7 +204,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counter = rootFeature.storeOf<_CounterStore>();
+      final counter = rootFeature.storeOf<_CounterStore>(container);
       var builderCallCount = 0;
 
       await pumpFeature(

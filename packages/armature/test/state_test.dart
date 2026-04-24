@@ -78,20 +78,6 @@ void main() {
       expect(calls, equals(1));
     });
 
-    test('listenerCount reflects active subscriptions', () {
-      final s = State<int>(state: 0);
-      expect(s.listenerCount, equals(0));
-
-      final d1 = s.subscribe((_, _) {}, fireImmediately: false);
-      final d2 = s.subscribe((_, _) {}, fireImmediately: false);
-      expect(s.listenerCount, equals(2));
-
-      d1();
-      expect(s.listenerCount, equals(1));
-      d2();
-      expect(s.listenerCount, equals(0));
-    });
-
     test('setter and update() are no-ops after dispose', () {
       final s = State<int>(state: 0);
       var calls = 0;

@@ -61,10 +61,10 @@ ActivationSetup whenStoreState<TExports, TState>({
 /// the owning feature toggles `.active` whenever [feature] is
 /// [FeatureStatus.active], `.inactive` otherwise.
 ///
-/// Conceptually equivalent to `whenStoreState` gated on the parent's
-/// status, but implemented via the public `parentApi.statusOf(feature)`
-/// accessor rather than reaching into the feature's `@internal` status
-/// store.
+/// Subscribes to the parent's status store via
+/// `parentApi.statusOf(feature)`. The per-container status store lives
+/// on the feature's runtime, so every container that uses this helper
+/// gets its own independent subscription wired up at activation time.
 ///
 /// ```dart
 /// final decoratorFeature = createFeature(

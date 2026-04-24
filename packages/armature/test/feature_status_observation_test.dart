@@ -19,8 +19,11 @@ void main() {
       final container = await startedContainer(features: [parent, child]);
 
       // Both features auto-activate on start.
-      expect(parent.internal.statusStore.state, equals(FeatureStatus.active));
-      final statusStore = child.internal.parent.statusOf(parent);
+      expect(
+        container.runtimeOf(parent).statusStore.state,
+        equals(FeatureStatus.active),
+      );
+      final statusStore = container.runtimeOf(child).parent.statusOf(parent);
       expect(statusStore.state, equals(FeatureStatus.active));
       expect(container.statusOf(parent), equals(FeatureStatus.active));
     });
@@ -29,10 +32,10 @@ void main() {
       final unrelated = createFeature(name: 'unrelated');
       final feature = createFeature(name: 'feature');
 
-      await startedContainer(features: [unrelated, feature]);
+      final container = await startedContainer(features: [unrelated, feature]);
 
       expect(
-        () => feature.internal.parent.statusOf(unrelated),
+        () => container.runtimeOf(feature).parent.statusOf(unrelated),
         throwsA(
           isA<FeatureResolutionError>().having(
             (e) => e.reason,
@@ -52,9 +55,12 @@ void main() {
 
         final container = await startedContainer(features: [gated, observer]);
 
-        final statusStore = observer.internal.parent.statusOf(gated);
+        final statusStore = container
+            .runtimeOf(observer)
+            .parent
+            .statusOf(gated);
         final transitions = <FeatureStatus>[statusStore.state];
-        final dispose = statusStore.subscribe((_, next) {
+        final dispose = statusStore.subscribe((_, FeatureStatus next) {
           transitions.add(next);
         });
         addTearDown(dispose);
@@ -126,10 +132,10 @@ void main() {
       () async {
         final parent = createFeature(name: 'parent');
         final child = createFeature(name: 'child', dependsOn: [parent]);
-        await startedContainer(features: [parent, child]);
+        final container = await startedContainer(features: [parent, child]);
 
-        final a = child.internal.parent.statusOf(parent);
-        final b = child.internal.parent.statusOf(parent);
+        final a = container.runtimeOf(child).parent.statusOf(parent);
+        final b = container.runtimeOf(child).parent.statusOf(parent);
         expect(identical(a, b), isTrue);
       },
     );
@@ -144,7 +150,7 @@ void main() {
 
       final container = await startedContainer(features: [optional, observer]);
 
-      final status = observer.internal.parent.statusOf(optional);
+      final status = container.runtimeOf(observer).parent.statusOf(optional);
       expect(status.state, equals(FeatureStatus.disabled));
 
       await container.toggleFeature(optional, ToggleState.active);
@@ -156,17 +162,12 @@ void main() {
       final source = createFeature(name: 'source')
         ..activation(manualActivation());
 
-      // Child uses whenStoreState against source's statusStore — a
-      // declarative `whenActive(source)` built on primitives.
-      final dependent =
-          createFeature(name: 'dependent', optionalDependsOn: [source])
-            ..activation(
-              whenStoreState(
-                feature: source,
-                store: (_) => source.internal.statusStore,
-                predicate: (s) => s == FeatureStatus.active,
-              ),
-            );
+      // Child uses `whenActive(source)` — the declarative primitive
+      // that subscribes to the source's status store.
+      final dependent = createFeature(
+        name: 'dependent',
+        optionalDependsOn: [source],
+      )..activation(whenActive(source));
 
       final container = await startedContainer(features: [source, dependent]);
 
@@ -193,7 +194,7 @@ void main() {
       );
       await container.start();
 
-      final store = child.internal.parent.statusOf(parent);
+      final store = container.runtimeOf(child).parent.statusOf(parent);
       // Before dispose: reads + subscribes ok.
       expect(store.state, equals(FeatureStatus.active));
 

@@ -1,41 +1,49 @@
+import 'package:armature/armature.dart' show AppContainer;
 import 'package:flutter/widgets.dart' show FlutterError;
 import 'package:meta/meta.dart' show internal;
 
 import './renderer.dart' show Renderer;
 
-/// Process-wide holder for the active [Renderer].
+/// Per-[AppContainer] renderer binding.
 ///
-/// **Multi-container caveat:** This is a global singleton. Running two
-/// [AppContainer] instances side-by-side with different renderers is
-/// unsupported — whichever one bootstraps last wins, and slot widgets
-/// rendered via the earlier container will route through the new
-/// renderer. Manage container lifetimes strictly sequentially: dispose
-/// the old container (which calls [reset] via `onDispose`) before
-/// bootstrapping a new one.
-class _RendererContext {
-  Renderer? _renderer;
+/// Uses an [Expando] to attach the active renderer to a specific
+/// [AppContainer] instance without the core `armature` package needing
+/// any knowledge of Flutter or rendering. When the container is
+/// garbage-collected the Expando entry clears automatically — no
+/// disposer needed.
+///
+/// Two concurrent [AppContainer] instances hold independent renderers
+/// — disposing one does not touch the other's binding.
+final Expando<Renderer> _rendererForContainer = Expando<Renderer>(
+  'armature_flutter.renderer',
+);
 
+/// Typed accessor for the per-container renderer.
+extension ContainerRenderer on AppContainer {
+  /// Returns the [Renderer] bound to this container. Throws when the
+  /// container was never bootstrapped by [ArmatureApp] or `bootstrap()`.
   Renderer get renderer {
-    final r = _renderer;
+    final r = _rendererForContainer[this];
     if (r == null) {
       throw FlutterError(
-        'Renderer not initialized. Call bootstrap() before rendering.',
+        'Renderer not initialized for this AppContainer. '
+        'Did you bootstrap via ArmatureApp or bootstrap()?',
       );
     }
     return r;
   }
 
-  set renderer(Renderer renderer) {
-    _renderer = renderer;
+  /// Binds [renderer] to this container. Idempotent — the last setter
+  /// wins, so re-calling with a different renderer hot-swaps the
+  /// binding (but this is an unusual pattern; typically called once
+  /// from `ArmatureApp.initState` or `bootstrap()`).
+  void setRenderer(Renderer renderer) {
+    _rendererForContainer[this] = renderer;
   }
 
-  /// Drops the cached renderer. Invoked automatically by
-  /// [AppContainer.onDispose] in `bootstrap()` and `ArmatureApp`; tests may
-  /// also call it directly in `tearDown`.
+  /// Framework-internal probe: returns the bound [Renderer] or `null`
+  /// when nothing is bound. Used by `pumpFeature` in tests to install
+  /// a default renderer only when the caller hasn't provided one.
   @internal
-  void reset() {
-    _renderer = null;
-  }
+  Renderer? get maybeRenderer => _rendererForContainer[this];
 }
-
-final rendererContext = _RendererContext();

@@ -8,7 +8,7 @@ import './_start_failure.dart' show reportStartFailure;
 import './renderer/flutter_renderer.dart'
     show FlutterRenderer, FlutterRendererOptions;
 import './renderer/renderer.dart' show Renderer;
-import './renderer/renderer_context.dart' show rendererContext;
+import './renderer/renderer_context.dart' show ContainerRenderer;
 
 /// Widget-tree wrapper installed by [bootstrap] — runs the returned
 /// `render` with any child to mount the armature provider stack above it.
@@ -26,26 +26,10 @@ typedef BootstrapResult = ({AppContainer container, Render render});
 /// **Prefer [ArmatureApp]** for typical apps — it manages the container's
 /// full widget-mounted lifecycle (create on `initState`, dispose on
 /// `dispose`). Reach for [bootstrap] only when you need manual control
-/// over that lifecycle, e.g.:
-///   * wiring the container into a widget tree whose root isn't a
-///     Flutter widget you own (`runApp(MyApp(...))` style where `MyApp`
-///     isn't [ArmatureApp]);
-///   * driving the container from a test harness that wants to inspect
-///     it before any widget is built;
-///   * sharing one container across multiple top-level widgets.
+/// over that lifecycle.
 ///
-/// `start()` is kicked off fire-and-forget; if it throws, the error is
-/// routed through `containerOptions.errorHandler` (if supplied) with
-/// `source: '<app-container>'`, otherwise logged via [logger]. The
-/// returned [AppContainer] is usable as soon as a slot apply reaches a
-/// `.working` status — earlier calls surface via the container's own
-/// starting-state guards.
-///
-/// ```dart
-/// final bootstrap = await bootstrap(features: [layoutFeature]);
-/// runApp(bootstrap.render(child: const MyApp()));
-/// // ... later: await bootstrap.container.dispose();
-/// ```
+/// The renderer is stored on the container itself — no global singleton
+/// — so multiple bootstraps with different renderers coexist cleanly.
 Future<BootstrapResult> bootstrap({
   required List<AnyFeature> features,
   Renderer? customRenderer,
@@ -59,10 +43,10 @@ Future<BootstrapResult> bootstrap({
     logger: logger,
   );
 
-  rendererContext.renderer =
-      customRenderer ??
-      FlutterRenderer(options: renderOptions ?? FlutterRendererOptions());
-  container.onDispose(rendererContext.reset);
+  container.setRenderer(
+    customRenderer ??
+        FlutterRenderer(options: renderOptions ?? FlutterRendererOptions()),
+  );
 
   unawaited(
     container.start().catchError(
@@ -75,7 +59,7 @@ Future<BootstrapResult> bootstrap({
     ),
   );
 
-  var renderContent = rendererContext.renderer.renderRoot(container: container);
+  var renderContent = container.renderer.renderRoot(container: container);
 
   flutter.Widget render({required flutter.Widget child}) {
     return renderContent(child: child);

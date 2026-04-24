@@ -211,7 +211,13 @@ void main() {
     );
   });
 
-  group('Service tasks', () {
+  // Integration smoke tests: verify Store.createTask correctly
+  // delegates to the underlying Task for every strategy, plus the
+  // Store↔Task dispose cascade. Pure strategy mechanics (state
+  // machine transitions, dispose rejection semantics, edge cases)
+  // live in `task_strategy_test.dart` and exercise the `create` /
+  // `createVoid` factories directly.
+  group('Store × Task integration', () {
     test(
       'createTask() with "strategy: once" should call the function only once',
       () async {
@@ -427,51 +433,6 @@ void main() {
           service.syncThrowTask.state,
           isA<TaskFailed<int, int, Object>>(),
         );
-      },
-    );
-
-    test(
-      'TaskState variants use value equality (stable listener notifies)',
-      () {
-        const a = TaskIdle<int, String, Object>();
-        const b = TaskIdle<int, String, Object>();
-        expect(a, equals(b));
-
-        const p1 = TaskPending<int, String, Object>(42);
-        const p2 = TaskPending<int, String, Object>(42);
-        const p3 = TaskPending<int, String, Object>(43);
-        expect(p1, equals(p2));
-        expect(p1, isNot(equals(p3)));
-
-        const d1 = TaskDone<int, String, Object>('ok');
-        const d2 = TaskDone<int, String, Object>('ok');
-        const d3 = TaskDone<int, String, Object>('nope');
-        expect(d1, equals(d2));
-        expect(d1, isNot(equals(d3)));
-      },
-    );
-
-    test(
-      'pattern-matching on Task.state exercises the sealed hierarchy',
-      () async {
-        final service = TestService(state: const (id: 0));
-
-        String label(TaskState<TaskParams, TaskResult, Object?> s) =>
-            switch (s) {
-              TaskIdle() => 'idle',
-              TaskPending(:final params) => 'pending(${params.amount})',
-              TaskDone(:final result) => 'done(${result.receivedAmount})',
-              TaskFailed(:final error) => 'failed($error)',
-            };
-
-        expect(label(service.onceSuccessTask.state), equals('idle'));
-
-        final params = const TaskParams(7);
-        final future = service.onceSuccessTask(params);
-        expect(label(service.onceSuccessTask.state), equals('pending(7)'));
-
-        await future;
-        expect(label(service.onceSuccessTask.state), equals('done(7)'));
       },
     );
 

@@ -1,15 +1,17 @@
 import 'package:armature/armature.dart' show Store;
 import 'package:flutter/widgets.dart' show BuildContext, FlutterError;
 
+import 'container_context.dart' show ContainerContext;
 import 'feature_context.dart' show FeatureContext;
 
 /// Namespace helper for typed [Store] lookup from the enclosing slot's
-/// feature.
+/// feature — scoped to the enclosing [ContainerContext].
 ///
-/// Walks up the widget tree for the nearest [FeatureContext], then asks
-/// that feature's scope API for a store of type `T`. Fails loudly if
-/// called outside a slot, or if the feature doesn't own a store of the
-/// requested type (via [StoreLookupError]).
+/// Walks up the widget tree for the nearest [FeatureContext] and
+/// [ContainerContext]; asks the container for that feature's runtime,
+/// then pulls out a store of type `T`. Fails loudly if called outside
+/// a slot, outside a container, or if the feature doesn't own a store
+/// of the requested type (via [StoreLookupError]).
 ///
 /// ```dart
 /// class _NoteTile extends StatelessWidget {
@@ -24,9 +26,10 @@ class StoreContext {
   StoreContext._();
 
   /// Returns the [Store] of type `T` owned by the slot's enclosing
-  /// feature. Throws [FlutterError] if no [FeatureContext] ancestor is
-  /// present; throws [StoreLookupError] if the feature doesn't own a
-  /// store of type `T`.
+  /// feature within the enclosing [ContainerContext]. Throws
+  /// [FlutterError] if no [FeatureContext] / [ContainerContext]
+  /// ancestor is present; throws [StoreLookupError] if the feature
+  /// doesn't own a store of type `T`.
   static T of<T extends Store>(BuildContext context) {
     final featureContext = context
         .dependOnInheritedWidgetOfExactType<FeatureContext>();
@@ -36,7 +39,8 @@ class StoreContext {
         'contain a FeatureContext.\nThis widget must be a descendant of a slot widget.',
       );
     }
-    return featureContext.feature.internal.scopeApi.store<T>();
+    final container = ContainerContext.of(context).container;
+    return container.runtimeOf(featureContext.feature).scopeApi.store<T>();
   }
 }
 

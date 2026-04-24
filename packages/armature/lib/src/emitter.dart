@@ -48,19 +48,28 @@ class Emitter<TEvent> {
 
   /// Fires [event] to every currently-registered listener.
   ///
-  /// Iterates a defensive snapshot of the listener set, so listeners
-  /// are free to [add] or [remove] subscribers for the same [event]
-  /// during their own invocation (classic one-shot-listener pattern
-  /// — "fire, then remove myself"). The snapshot is only built when
-  /// the event has registered listeners, so idle events allocate
-  /// nothing.
+  /// Allocation policy: single-listener events skip the defensive
+  /// snapshot and call the listener directly. Multi-listener events
+  /// iterate a snapshot so listeners are free to [add] or [remove]
+  /// subscribers for the same [event] during their own invocation
+  /// (classic one-shot-listener pattern — "fire, then remove myself").
+  /// Idle events allocate nothing.
   ///
   /// A listener throw is caught and forwarded to [onListenerError];
   /// siblings still run.
   void emit(TEvent event) {
     final eventListeners = _listeners[event];
-    if (eventListeners == null || eventListeners.isEmpty) return;
-
+    if (eventListeners == null) return;
+    final count = eventListeners.length;
+    if (count == 0) return;
+    if (count == 1) {
+      try {
+        eventListeners.first();
+      } on Object catch (e, st) {
+        onListenerError(event, e, st);
+      }
+      return;
+    }
     for (final listener in eventListeners.toList(growable: false)) {
       try {
         listener();
@@ -68,17 +77,6 @@ class Emitter<TEvent> {
         onListenerError(event, e, st);
       }
     }
-  }
-
-  /// Whether [event] currently has at least one registered listener.
-  /// Callers use this to short-circuit work that's only worth doing
-  /// when someone is listening.
-  bool hasListeners(TEvent event) {
-    var eventListeners = _listeners[event];
-    if (eventListeners == null) {
-      return false;
-    }
-    return eventListeners.isNotEmpty;
   }
 
   /// Unsubscribes [listener] from [event]. No-op if not previously
