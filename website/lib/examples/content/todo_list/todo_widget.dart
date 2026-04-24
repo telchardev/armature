@@ -1,41 +1,65 @@
+import 'package:armature/armature.dart';
 import 'package:armature_flutter/armature_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'todo_store.dart';
 
-class TodoDemoWidget extends StatefulWidget {
+/// Feature owning the [TodoStore]. The container disposes the store
+/// when the ArmatureApp unmounts — no widget-level dispose needed.
+final todoFeature = createFeature(
+  name: 'Todo',
+  stores: (_) => (todos: TodoStore()),
+  exports: (api) => api.own,
+);
+
+final _todoRoot = createFeatureRoot(
+  feature: todoFeature,
+  widget: const _TodoView(),
+);
+
+class TodoDemoWidget extends StatelessWidget {
   const TodoDemoWidget({super.key});
 
   @override
-  State<TodoDemoWidget> createState() => _TodoDemoWidgetState();
+  Widget build(BuildContext context) {
+    return ArmatureApp(features: [todoFeature], child: _todoRoot(data: null));
+  }
 }
 
-class _TodoDemoWidgetState extends State<TodoDemoWidget> {
-  late final TodoStore _store;
+class _TodoView extends StatefulWidget {
+  const _TodoView();
+
+  @override
+  State<_TodoView> createState() => _TodoViewState();
+}
+
+class _TodoViewState extends State<_TodoView> {
+  // TextEditingController is UI-only — not a Store — so the widget
+  // owns it and disposes it. Framework only manages Stores.
   late final TextEditingController _input;
 
   @override
   void initState() {
     super.initState();
-    _store = TodoStore();
     _input = TextEditingController();
   }
 
   @override
   void dispose() {
-    _store.dispose();
     _input.dispose();
     super.dispose();
-  }
-
-  void _submit() {
-    _store.add(_input.text);
-    _input.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final store = StoreContext.of<TodoStore>(context);
+
+    void submit() {
+      store.add(_input.text);
+      _input.clear();
+    }
+
     return Container(
       padding: const EdgeInsets.all(24),
       constraints: const BoxConstraints(maxWidth: 480),
@@ -53,7 +77,7 @@ class _TodoDemoWidgetState extends State<TodoDemoWidget> {
                 child: TextField(
                   controller: _input,
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _submit(),
+                  onSubmitted: (_) => submit(),
                   decoration: const InputDecoration(
                     hintText: 'Add a todo…',
                     border: OutlineInputBorder(),
@@ -62,13 +86,13 @@ class _TodoDemoWidgetState extends State<TodoDemoWidget> {
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _submit, child: const Text('Add')),
+              FilledButton(onPressed: submit, child: const Text('Add')),
             ],
           ),
           const SizedBox(height: 16),
           StateObserver(
             builder: (_) {
-              final items = _store.state.items;
+              final items = store.state.items;
               if (items.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
@@ -86,8 +110,8 @@ class _TodoDemoWidgetState extends State<TodoDemoWidget> {
                   for (final todo in items)
                     _TodoTile(
                       todo: todo,
-                      onToggle: () => _store.toggle(todo.id),
-                      onRemove: () => _store.remove(todo.id),
+                      onToggle: () => store.toggle(todo.id),
+                      onRemove: () => store.remove(todo.id),
                     ),
                 ],
               );
@@ -96,7 +120,7 @@ class _TodoDemoWidgetState extends State<TodoDemoWidget> {
           const SizedBox(height: 8),
           StateObserver(
             builder: (_) {
-              final items = _store.state.items;
+              final items = store.state.items;
               final remaining = items.where((t) => !t.done).length;
               final hasDone = items.any((t) => t.done);
               return Row(
@@ -109,7 +133,7 @@ class _TodoDemoWidgetState extends State<TodoDemoWidget> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: hasDone ? _store.clearDone : null,
+                    onPressed: hasDone ? store.clearDone : null,
                     child: const Text('Clear done'),
                   ),
                 ],

@@ -4,34 +4,65 @@ import 'package:flutter/material.dart';
 
 import 'search_store.dart';
 
-class SearchDemoWidget extends StatefulWidget {
+/// Feature owning the [SearchStore] — the framework disposes it when
+/// the container tears down, which includes the pending debounce
+/// timer and task state.
+final searchFeature = createFeature(
+  name: 'Search',
+  stores: (_) => (search: SearchStore()),
+  exports: (api) => api.own,
+);
+
+final _searchRoot = createFeatureRoot(
+  feature: searchFeature,
+  widget: const _SearchView(),
+);
+
+class SearchDemoWidget extends StatelessWidget {
   const SearchDemoWidget({super.key});
 
   @override
-  State<SearchDemoWidget> createState() => _SearchDemoWidgetState();
+  Widget build(BuildContext context) {
+    return ArmatureApp(
+      features: [searchFeature],
+      child: _searchRoot(data: null),
+    );
+  }
 }
 
-class _SearchDemoWidgetState extends State<SearchDemoWidget> {
-  late final SearchStore _store;
+class _SearchView extends StatefulWidget {
+  const _SearchView();
+
+  @override
+  State<_SearchView> createState() => _SearchViewState();
+}
+
+class _SearchViewState extends State<_SearchView> {
+  // Plain TextEditingController — UI state, widget-owned.
   late final TextEditingController _input;
 
   @override
   void initState() {
     super.initState();
-    _store = SearchStore();
     _input = TextEditingController();
   }
 
   @override
   void dispose() {
-    _store.dispose();
     _input.dispose();
     super.dispose();
+  }
+
+  void _rerun(SearchStore store, String query) {
+    _input.text = query;
+    _input.selection = TextSelection.collapsed(offset: query.length);
+    store.search(query);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final store = StoreContext.of<SearchStore>(context);
     return Container(
       padding: const EdgeInsets.all(24),
       constraints: const BoxConstraints(maxWidth: 480),
@@ -45,7 +76,7 @@ class _SearchDemoWidgetState extends State<SearchDemoWidget> {
         children: [
           TextField(
             controller: _input,
-            onChanged: (value) => _store.search(value),
+            onChanged: (value) => store.search(value),
             decoration: const InputDecoration(
               hintText: 'Type to search (try "flu")',
               prefixIcon: Icon(Icons.search),
@@ -53,18 +84,52 @@ class _SearchDemoWidgetState extends State<SearchDemoWidget> {
               isDense: true,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          StateObserver(builder: (_) => _recentChips(theme, store)),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 220,
-            child: StateObserver(builder: (_) => _results(theme)),
+            height: 200,
+            child: StateObserver(builder: (_) => _results(theme, store)),
           ),
         ],
       ),
     );
   }
 
-  Widget _results(ThemeData theme) {
-    final taskState = _store.search.state;
+  Widget _recentChips(ThemeData theme, SearchStore store) {
+    final recent = store.state.recent;
+    if (recent.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          'Recent:',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        for (final query in recent)
+          InputChip(
+            visualDensity: VisualDensity.compact,
+            label: Text(query),
+            onPressed: () => _rerun(store, query),
+            onDeleted: () => store.removeRecent(query),
+            deleteIconBoxConstraints: const BoxConstraints(
+              minWidth: 18,
+              minHeight: 18,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _results(ThemeData theme, SearchStore store) {
+    final taskState = store.search.state;
     return switch (taskState) {
       TaskIdle() => _empty(
         theme,

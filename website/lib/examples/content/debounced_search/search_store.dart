@@ -1,28 +1,53 @@
 import 'package:armature/armature.dart';
 
-/// Minimal store with a single debounced task.
+/// Store with a single debounced search task and a live list of
+/// recent *successful* queries.
 ///
 /// The debounce strategy coalesces rapid calls into one run at the end
-/// of the quiet window. Ideal for search-as-you-type: every keystroke
-/// invokes the task, but the underlying work only fires once the user
-/// pauses typing.
-class SearchStore extends Store<({String lastQuery})> {
-  SearchStore() : super(state: (lastQuery: ''));
+/// of the quiet window — ideal for search-as-you-type. Every successful
+/// (non-empty result) search appends its query to [recent] in MRU
+/// order, capped at [_recentLimit].
+class SearchStore extends Store<({String lastQuery, List<String> recent})> {
+  SearchStore() : super(state: (lastQuery: '', recent: const []));
+
+  static const _recentLimit = 5;
 
   late final search = createTask<String, List<String>, Never>(
     fn: (query) async {
-      state = (lastQuery: query);
+      final trimmed = query.trim();
+      // Reflect the in-flight query immediately so the UI can show it.
+      state = (lastQuery: query, recent: state.recent);
       await Future<void>.delayed(const Duration(milliseconds: 300));
-      if (query.trim().isEmpty) {
+      if (trimmed.isEmpty) {
         return const [];
       }
-      final needle = query.toLowerCase();
-      return _catalogue
+      final needle = trimmed.toLowerCase();
+      final results = _catalogue
           .where((item) => item.toLowerCase().contains(needle))
           .toList();
+      if (results.isNotEmpty) {
+        // Move this query to the front, drop any prior duplicate,
+        // and cap the list. `state.recent` here is the LATEST value
+        // because the task just awaited — safe to read.
+        final updated = <String>[
+          trimmed,
+          ...state.recent.where((q) => q.toLowerCase() != needle),
+        ].take(_recentLimit).toList();
+        state = (lastQuery: query, recent: updated);
+      }
+      return results;
     },
     strategy: TaskStrategy.debounce(Duration(milliseconds: 400)),
   );
+
+  /// Drop a single query from the MRU list (used by the chip's
+  /// delete affordance). Preserves [lastQuery].
+  void removeRecent(String query) {
+    state = (
+      lastQuery: state.lastQuery,
+      recent: state.recent.where((q) => q != query).toList(growable: false),
+    );
+  }
 }
 
 const _catalogue = [

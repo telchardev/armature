@@ -19,13 +19,12 @@ const examplesTree = <ExampleSection>[
     entries: [
       ExampleEntry(slug: 'counter', title: 'Counter'),
       ExampleEntry(slug: 'todo-list', title: 'Todo list'),
+      ExampleEntry(slug: 'debounced-search', title: 'Debounced search'),
     ],
   ),
   ExampleSection(
     title: 'Composition',
     entries: [
-      ExampleEntry(slug: 'multi-feature', title: 'Multi-feature wiring'),
-      ExampleEntry(slug: 'debounced-search', title: 'Debounced search'),
       ExampleEntry(slug: 'feature-toggles', title: 'Feature toggles'),
       ExampleEntry(slug: 'auth-flow', title: 'Auth flow'),
     ],

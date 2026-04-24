@@ -106,11 +106,11 @@ class _CodeTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: const [
-          _Caption('The store'),
-          CodeBlock(code: _storeSource, language: 'dart'),
+          _Caption('counter_store.dart'),
+          CodeBlock(code: _counterStoreSource, language: 'dart'),
           SizedBox(height: 20),
-          _Caption('The widget'),
-          CodeBlock(code: _widgetSource, language: 'dart'),
+          _Caption('counter_widget.dart'),
+          CodeBlock(code: _counterWidgetSource, language: 'dart'),
         ],
       ),
     );
@@ -136,9 +136,21 @@ class _Caption extends StatelessWidget {
   }
 }
 
-const _storeSource = '''class CounterStore extends Store<({int value})> {
+const _counterStoreSource = r'''import 'package:armature/armature.dart';
+
+/// State record — a single integer value.
+typedef CounterState = ({int value});
+
+/// Reactive store for the counter example.
+///
+/// Demonstrates two task strategies: `queue` for serialised asynchronous
+/// increments, and `debounce` for rate-limited bumps that collapse rapid
+/// calls into a single write.
+class CounterStore extends Store<CounterState> {
   CounterStore() : super(state: (value: 0));
 
+  /// Increments after a short delay. With `queue`, two rapid taps run
+  /// back-to-back — you see the value climb smoothly.
   late final increment = createVoidTask(
     fn: () async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -147,6 +159,7 @@ const _storeSource = '''class CounterStore extends Store<({int value})> {
     strategy: TaskStrategy.queue,
   );
 
+  /// Fires at most once per 400 ms, no matter how fast you tap.
   late final debouncedBump = createVoidTask(
     fn: () async {
       state = (value: state.value + 1);
@@ -154,41 +167,88 @@ const _storeSource = '''class CounterStore extends Store<({int value})> {
     strategy: TaskStrategy.debounce(Duration(milliseconds: 400)),
   );
 
+  /// Resets the counter to zero immediately.
   late final reset = createVoidTask(
-    fn: () async => state = (value: 0),
+    fn: () async {
+      state = (value: 0);
+    },
     strategy: TaskStrategy.queue,
   );
-}''';
+}
+''';
 
-const _widgetSource = '''class CounterDemoWidget extends StatefulWidget {
+const _counterWidgetSource = r'''import 'package:armature/armature.dart';
+import 'package:armature_flutter/armature_flutter.dart';
+import 'package:flutter/material.dart';
+
+import 'counter_store.dart';
+
+/// Feature owning the [CounterStore]. The framework constructs the store
+/// on container start and disposes it on container teardown — no manual
+/// `store.dispose()` needed in widget code.
+final counterFeature = createFeature(
+  name: 'Counter',
+  stores: (_) => (counter: CounterStore()),
+  exports: (api) => api.own,
+);
+
+final _counterRoot = createFeatureRoot(
+  feature: counterFeature,
+  widget: const _CounterView(),
+);
+
+class CounterDemoWidget extends StatelessWidget {
   const CounterDemoWidget({super.key});
 
   @override
-  State<CounterDemoWidget> createState() => _State();
+  Widget build(BuildContext context) {
+    return ArmatureApp(
+      features: [counterFeature],
+      child: _counterRoot(data: null),
+    );
+  }
 }
 
-class _State extends State<CounterDemoWidget> {
-  late final _store = CounterStore();
-
-  @override
-  void dispose() {
-    _store.dispose();
-    super.dispose();
-  }
+class _CounterView extends StatelessWidget {
+  const _CounterView();
 
   @override
   Widget build(BuildContext context) {
+    final store = StoreContext.of<CounterStore>(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         StateObserver(
-          builder: (_) => Text('\${_store.state.value}'),
+          builder: (_) => Text(
+            '${store.state.value}',
+            style: Theme.of(context).textTheme.displayLarge,
+          ),
         ),
-        FilledButton(
-          onPressed: _store.increment,
-          child: const Text('Increment'),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.center,
+          children: [
+            FilledButton.icon(
+              onPressed: () => store.increment(),
+              icon: const Icon(Icons.add),
+              label: const Text('Increment (queue)'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => store.debouncedBump(),
+              icon: const Icon(Icons.timer_outlined),
+              label: const Text('Debounced bump (400ms)'),
+            ),
+            TextButton.icon(
+              onPressed: () => store.reset(),
+              icon: const Icon(Icons.restart_alt),
+              label: const Text('Reset'),
+            ),
+          ],
         ),
       ],
     );
   }
-}''';
+}
+''';

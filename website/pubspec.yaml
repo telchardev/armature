@@ -20,6 +20,7 @@ dependencies:
   flutter_highlighter: ^0.1.1
   highlighter: ^0.1.1
   google_fonts: ^8.0.2
+  shared_preferences: ^2.5.5
   armature:
     path: ../packages/armature
   armature_flutter:

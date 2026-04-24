@@ -1,37 +1,42 @@
+import 'package:armature/armature.dart';
 import 'package:armature_flutter/armature_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'counter_store.dart';
 
-/// Mounts a [CounterStore] and observes it reactively.
-///
-/// The store is created in `initState` and disposed in `dispose`, so the
-/// preview state resets when the user navigates away and back.
-class CounterDemoWidget extends StatefulWidget {
+/// Feature owning the [CounterStore]. The framework constructs the store
+/// on container start and disposes it on container teardown — no manual
+/// `store.dispose()` needed in widget code.
+final counterFeature = createFeature(
+  name: 'Counter',
+  stores: (_) => (counter: CounterStore()),
+  exports: (api) => api.own,
+);
+
+final _counterRoot = createFeatureRoot(
+  feature: counterFeature,
+  widget: const _CounterView(),
+);
+
+class CounterDemoWidget extends StatelessWidget {
   const CounterDemoWidget({super.key});
 
   @override
-  State<CounterDemoWidget> createState() => _CounterDemoWidgetState();
+  Widget build(BuildContext context) {
+    return ArmatureApp(
+      features: [counterFeature],
+      child: _counterRoot(data: null),
+    );
+  }
 }
 
-class _CounterDemoWidgetState extends State<CounterDemoWidget> {
-  late final CounterStore _store;
-
-  @override
-  void initState() {
-    super.initState();
-    _store = CounterStore();
-  }
-
-  @override
-  void dispose() {
-    _store.dispose();
-    super.dispose();
-  }
+class _CounterView extends StatelessWidget {
+  const _CounterView();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final store = StoreContext.of<CounterStore>(context);
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -44,7 +49,7 @@ class _CounterDemoWidgetState extends State<CounterDemoWidget> {
         children: [
           StateObserver(
             builder: (_) => Text(
-              '${_store.state.value}',
+              '${store.state.value}',
               style: theme.textTheme.displayLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: theme.colorScheme.primary,
@@ -65,17 +70,17 @@ class _CounterDemoWidgetState extends State<CounterDemoWidget> {
             alignment: WrapAlignment.center,
             children: [
               FilledButton.icon(
-                onPressed: () => _store.increment(),
+                onPressed: () => store.increment(),
                 icon: const Icon(Icons.add),
                 label: const Text('Increment (queue)'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _store.debouncedBump(),
+                onPressed: () => store.debouncedBump(),
                 icon: const Icon(Icons.timer_outlined),
                 label: const Text('Debounced bump (400ms)'),
               ),
               TextButton.icon(
-                onPressed: () => _store.reset(),
+                onPressed: () => store.reset(),
                 icon: const Icon(Icons.restart_alt),
                 label: const Text('Reset'),
               ),
