@@ -15,11 +15,13 @@ import 'content/ports.dart';
 import 'content/slot_widgets.dart';
 import 'content/stores.dart';
 import 'content/tasks.dart';
+import 'content/when_to_use.dart';
 import 'docs_tree.dart';
 
 /// Maps a doc slug to its content widget. Slugs without a registered widget
 /// fall through to [ComingSoonContent].
 const Map<String, Widget> _registry = {
+  'when-to-use': WhenToUseContent(),
   'getting-started': GettingStartedContent(),
   'installation': InstallationContent(),
   'features': FeaturesContent(),

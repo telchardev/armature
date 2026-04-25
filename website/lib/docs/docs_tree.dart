@@ -20,8 +20,9 @@ const docsTree = <DocSection>[
   DocSection(
     title: 'Getting started',
     entries: [
-      DocEntry(slug: 'getting-started', title: 'Introduction'),
+      DocEntry(slug: 'when-to-use', title: 'Is this for me?'),
       DocEntry(slug: 'installation', title: 'Installation'),
+      DocEntry(slug: 'getting-started', title: 'Introduction'),
     ],
   ),
   DocSection(

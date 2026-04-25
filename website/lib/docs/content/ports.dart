@@ -89,9 +89,9 @@ class PortsContent extends StatelessWidget {
         ),
         const CodeBlock(code: _slotUseSource, language: 'dart'),
         const DocParagraph(
-          'Multi slots take an order key and a direction (asc or desc). '
-          'A feature can contribute several widgets to the same slot by '
-          'calling useMultiSlot more than once.',
+          'Multi slots take an order key and a direction (asc or desc — '
+          'defaults to asc). A feature can contribute several widgets to '
+          'the same slot by calling useMultiSlot more than once.',
         ),
         const DocHeading('Ownership and dependencies'),
         const DocParagraph(

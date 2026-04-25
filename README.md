@@ -17,6 +17,8 @@ Large Flutter applications quickly become a tangled mess of providers, singleton
 - **Providing a reactive system** (Atom/Reaction) for fine-grained state tracking
 - **Composing UI via ports** — features inject widgets into named extension points without knowing about each other
 
+> **Is armature for your project?** It pays off in apps with several feature areas, multiple developers, or runtime feature toggles. For a one- or two-screen app, Provider or Riverpod ship faster. See **[Is this for me?](https://telchardev.github.io/armature/docs/when-to-use)** for a 30-second decision summary.
+
 ---
 
 ## Architecture
@@ -43,7 +45,8 @@ Large Flutter applications quickly become a tangled mess of providers, singleton
                |  (ArmatureApp, Slots,|
                |   StoreBuilder /   |
                |   StoreSelector,   |
-               |   Providers, FGO)  |
+               |   Providers,       |
+               |   FeatureGraphOverlay) |
                +-------------------+
 ```
 
@@ -89,7 +92,7 @@ final counterFeature = createFeature(
 );
 ```
 
-### 3. Run the app
+### 3. Run the app and read state
 
 ```dart
 import 'package:armature_flutter/armature_flutter.dart';
@@ -98,10 +101,33 @@ import 'package:flutter/material.dart';
 void main() {
   runApp(ArmatureApp(
     features: [counterFeature],
-    child: const MyApp(),
+    child: MaterialApp(home: counterRoot(data: null)),
   ));
 }
+
+// Mount the feature as a route / screen and read its store reactively:
+final counterRoot = createFeatureRoot(
+  feature: counterFeature,
+  widget: Scaffold(
+    body: Center(
+      child: StoreBuilder<CounterStore>(
+        builder: (ctx, store) => Text('${store.state}'),
+      ),
+    ),
+    floatingActionButton: Builder(
+      builder: (ctx) => FloatingActionButton(
+        onPressed: () => ctx.store<CounterStore>().increment(),
+        child: const Icon(Icons.add),
+      ),
+    ),
+  ),
+);
 ```
+
+`StoreBuilder<T>` rebuilds when any tracked `.state` read inside the
+builder changes; `context.store<T>()` is a one-shot imperative lookup
+for tap handlers (no rebuild). See
+[Stores & State](#stores--state) for `StoreSelector` and other tools.
 
 ---
 
@@ -125,6 +151,8 @@ final authFeature = createFeature(
   exports: (api) => api.own,
 );
 
+// Stateless feature — no own stores. Pure port-extension that adds
+// admin-only handlers via `..usePipe / ..useSingleSlot / ...`.
 // Optional dependencies stay reachable via `api.of(...)` even when
 // inactive — handy for features that merely *decorate* another.
 final adminFeature = createFeature(
@@ -166,7 +194,9 @@ adminFeature
   ..activation((parentApi, toggle, cleanup) {
     final auth = parentApi.of(authFeature).auth;
     cleanup.add(auth.subscribe((_, s) {
-      toggle(s.user?.name == 'admin' ? .active : .inactive);
+      toggle(s.user?.name == 'admin'
+          ? ToggleState.active
+          : ToggleState.inactive);
     }, fireImmediately: true));
   })
   ..onStart((api, cleanup) async {
@@ -184,8 +214,10 @@ Inside a port handler / `onStart` / activation setup, `api.statusOf(feature).sta
 inspectorSubFeature.useMultiSlot(
   layoutFeature.ports.actionsSlot,
   (_, api) {
-    // Hides when inspectorFeature is disabled; reappears on `.active`.
-    if (api.statusOf(inspectorFeature).state != .active) return null;
+    // Hides when inspectorFeature is disabled; reappears on .active.
+    if (api.statusOf(inspectorFeature).state != FeatureStatus.active) {
+      return null;
+    }
     return IconButton(icon: const Icon(Icons.search), onPressed: ...);
   },
 );
@@ -499,7 +531,7 @@ container.onPortChanged(
 );
 
 // Imperative toggle from outside an activation setup:
-await container.toggleFeature(someGatedFeature, .active);
+await container.toggleFeature(someGatedFeature, ToggleState.active);
 
 await container.dispose();
 ```

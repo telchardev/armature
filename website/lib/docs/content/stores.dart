@@ -80,15 +80,17 @@ class StoresContent extends StatelessWidget {
         const DocHeading('Task strategies'),
         const DocParagraph(
           'Every task picks a strategy that defines how concurrent calls '
-          'are handled. Five variants cover the common patterns:',
+          'are handled. Five variants cover the common patterns; the '
+          'strategy parameter is optional and defaults to queue:',
+        ),
+        const DocBullet(
+          'queue (default) — serialises calls FIFO; each waits for the '
+          'previous to complete. Good for ordered mutations like a counter '
+          'increment.',
         ),
         const DocBullet(
           'once — runs a single time; later calls return the cached result '
           'or share the in-flight future. Good for one-shot initialisation.',
-        ),
-        const DocBullet(
-          'queue — serialises calls FIFO; each waits for the previous to '
-          'complete. Good for ordered mutations like a counter increment.',
         ),
         const DocBullet(
           'latest — a new call supersedes the in-flight run. All pending '

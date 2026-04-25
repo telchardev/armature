@@ -94,7 +94,22 @@ class GettingStartedContent extends StatelessWidget {
   }
 }
 
-const _counterFeatureCode = '''final counterFeature = createFeature(
+const _counterFeatureCode =
+    '''// Host feature — declared once, shared by every tab. Owns the ports
+// (`tabsPipe`, `bodyKeyedSlot`, `fabSlot`) other features plug into.
+// See the Features doc for the full layout setup.
+final layoutFeature = createFeature(
+  name: 'Layout',
+  ports: (
+    tabsPipe: createPipe<List<TabSpec>>(name: 'layout.tabs'),
+    bodyKeyedSlot: createKeyedSingleSlot<LayoutMode>(name: 'layout.body'),
+    fabSlot: createMultiSlot<LayoutMode>(name: 'layout.fab'),
+  ),
+  stores: (_) => (activeTab: ActiveTabStore()),
+  exports: (api) => api.own,
+);
+
+final counterFeature = createFeature(
   name: 'Counter',
   dependsOn: [layoutFeature],
   stores: (_) => (counter: CounterStore()),
@@ -114,7 +129,16 @@ const _counterFeatureCode = '''final counterFeature = createFeature(
     );
   });''';
 
-const _bootstrapCode = '''void main() {
+const _bootstrapCode =
+    '''// Bind the layout feature to its root widget — see createFeatureRoot
+// doc for details. Every slot widget under `layoutRoot(...)` resolves
+// through this feature's scope.
+final layoutRoot = createFeatureRoot<LayoutMode>(
+  feature: layoutFeature,
+  widget: const LayoutShell(),
+);
+
+void main() {
   runApp(
     ArmatureApp(
       features: [
@@ -122,7 +146,7 @@ const _bootstrapCode = '''void main() {
         counterFeature,
         historyFeature,
       ],
-      child: layoutRoot(data: null),
+      child: layoutRoot(data: LayoutMode.phone),
     ),
   );
 }''';

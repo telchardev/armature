@@ -89,35 +89,102 @@ StoreSelector<({String name, int count})>(
 ## Slots — composing UI across features
 
 Slots are ports that produce widgets. The owning feature declares the
-slot; child features contribute widgets via extensions:
+slot; child features contribute widgets via extensions.
+
+### `SingleSlot` — pick by priority
 
 ```dart
-// In owner (layoutFeature):
-final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
+// owner (layoutFeature) declares the slot at top level:
+final titleSlot = createSingleSlot<LayoutMode>(name: 'layout.title');
 
-// In child feature:
-counterFeature.useSingleSlot(
-  layoutFeature.ports.bodySlot,
-  (data, api) => const CounterScreen(),
+final layoutFeature = createFeature(
+  name: 'Layout',
+  ports: (titleSlot: titleSlot),
+  stores: (_) => (activeTab: ActiveTabStore()),
+  exports: (api) => api.own,
+);
+
+// child feature contributes a widget:
+authFeature.useSingleSlot(
+  layoutFeature.ports.titleSlot,
+  (mode, api) => Text('Hello, ${api.own.auth.state.user?.name}'),
   priority: 2,
 );
 
-// Rendering the slot:
+// owner (or any descendant) renders the slot:
 SingleSlotProvider(
-  slot: layoutFeature.ports.bodySlot,
-  data: currentRoute,
-  builder: (child, _) => child ?? const Text('empty'),
+  slot: layoutFeature.ports.titleSlot,
+  data: LayoutMode.phone,
+  builder: (child, _) => child ?? const Text('No title'),
 )
 ```
 
-- **`SingleSlot`** — picks the highest-priority widget.
+### `KeyedSingleSlot` / `KeyedMultiSlot` — same slot, indexed by string key
+
+A keyed slot is a *family* of slots — one per key — sharing a single
+declaration. Useful when a parent hosts several routes / tabs in the
+same conceptual position.
+
+```dart
+// owner declares the keyed slot:
+final bodyKeyedSlot = createKeyedSingleSlot<LayoutMode>(name: 'layout.body');
+
+final layoutFeature = createFeature(
+  name: 'Layout',
+  ports: (body: bodyKeyedSlot),
+  stores: (_) => (activeTab: ActiveTabStore()),
+  exports: (api) => api.own,
+);
+
+// each child feature contributes to a specific key:
+counterFeature.useSingleSlot(
+  layoutFeature.ports.body('counter'),
+  (mode, api) => CounterTab(store: api.own.counter),
+);
+
+historyFeature.useSingleSlot(
+  layoutFeature.ports.body('history'),
+  (mode, api) => HistoryTab(store: api.own.history),
+);
+
+// render the active tab's slot:
+SingleSlotProvider(
+  slot: layoutFeature.ports.body(activeTab),
+  data: LayoutMode.phone,
+  builder: (child, _) => child ?? const Text('Empty tab'),
+)
+```
+
+`createKeyedMultiSlot` is the same idea for `MultiSlot` (one list of
+widgets per key).
+
+### Other slot kinds and providers
+
 - **`MultiSlot`** — collects all active widgets, sorts by `order`.
-- **`KeyedSingleSlot` / `KeyedMultiSlot`** — string-key-indexed
-  memoized variants (`createKeyedSingleSlot` / `createKeyedMultiSlot`).
+  Default `orderDirection` is `MultiSlotOrderDirection.asc`.
 - **`PipeProvider` / `BehaviorProvider`** — reactive providers for
   pipe / behavior ports.
 - **`MultiPortBuilder`** — reads any mix of ports in a single builder
-  with fine-grained reactive tracking.
+  with fine-grained reactive tracking. Each `reader.*` call tracks
+  exactly one port; rebuilds fire only for the ports that change:
+
+  ```dart
+  MultiPortBuilder(
+    builder: (reader, _) {
+      final tabs = reader.pipe(tabsPipe, initialValue: const <TabSpec>[]);
+      final actions = reader.multi(actionsSlot, data: LayoutMode.phone);
+      return Scaffold(
+        appBar: AppBar(actions: actions),
+        body: TabBar(tabs: [for (final t in tabs) Tab(text: t.label)]),
+      );
+    },
+  )
+  ```
+
+- **`StateObserver`** — raw reactive builder for arbitrary `Atom` /
+  `Store.state` reads, no DI lookup. Use when you build custom widgets
+  that touch reactive state outside the typed `StoreBuilder` /
+  `StoreSelector` path.
 
 ## Debug overlay
 

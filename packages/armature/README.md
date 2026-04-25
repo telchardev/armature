@@ -31,9 +31,12 @@ dependencies:
 ```dart
 import 'package:armature/armature.dart';
 
-class CounterStore extends Store<int> {
-  CounterStore() : super(state: 0);
-  void increment() => update((s) => s + 1);
+typedef CounterState = ({int value});
+
+class CounterStore extends Store<CounterState> {
+  CounterStore() : super(state: (value: 0));
+
+  void increment() => update((s) => (value: s.value + 1));
 }
 
 final counterFeature = createFeature(
@@ -150,10 +153,11 @@ nightFeature.useBehavior(layoutFeature.ports.themeBehavior, (api) {
 
 ### Tasks
 
-Strategy-backed async operations:
+Strategy-backed async operations. `strategy:` is optional —
+`Store.createTask` / `createVoidTask` default to `.queue`.
 
+- `.queue` **(default)** — FIFO sequential queue.
 - `.once` — blocks concurrent invocations until done.
-- `.queue` — FIFO sequential queue.
 - `.latest` — only the most recent input finishes.
 - `.debounce(duration)` — fires once after quiet period.
 - `.throttle(duration, edge)` — rate-limit with leading / trailing
@@ -171,6 +175,24 @@ Everything user-actionable reaches `ContainerOptions.errorHandler`:
 | Port mis-scoped apply | `PortError` | feature name |
 | Slot widget build throw | `RenderError` | feature name |
 | `onDispose` callback throw | `HandlerError` | `'<container>'` |
+
+## Advanced surface
+
+`package:armature/armature.dart` exposes the ~25 symbols you need to
+author features, stores, tasks, and ports. Framework plumbing —
+handler / listener typedefs (`BehaviorHandler`, `PipeHandler`,
+`TaskFn`, `StateChangeListener`, ...), port base classes (`Port`,
+`AnyPort`, `PortType`, `PortSubscription`), individual
+`TaskStrategy*` constructor classes, debug-overlay mirrors, and
+`LoggerDebugInfo` — lives in a separate barrel:
+
+```dart
+import 'package:armature/advanced.dart';
+```
+
+Reach for it when you need to type-annotate a handler field, build a
+custom debug overlay, or extend the framework. Day-to-day feature /
+store code should not need this import.
 
 ## Learn more
 

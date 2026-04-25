@@ -115,16 +115,17 @@ class TasksContent extends StatelessWidget {
         const CodeBlock(code: _errorSource, language: 'dart'),
         const DocHeading('Strategies at a glance'),
         const DocParagraph(
-          'Every task declares a strategy at construction. Each strategy '
-          'observes a different contract for concurrent calls:',
+          'Every task declares a strategy at construction. The parameter '
+          'is optional and defaults to queue; each strategy observes a '
+          'different contract for concurrent calls:',
+        ),
+        const DocBullet(
+          'queue (default) — FIFO; each call waits for the previous one '
+          'to complete. Order-preserving, no lost calls.',
         ),
         const DocBullet(
           'once — runs exactly one time across the task\'s lifetime. '
           'Later calls return the cached result or the in-flight future.',
-        ),
-        const DocBullet(
-          'queue — FIFO; each call waits for the previous one to '
-          'complete. Order-preserving, no lost calls.',
         ),
         const DocBullet(
           'latest — a new call supersedes an in-flight one. Only the '
