@@ -88,7 +88,9 @@ final class FeatureConfigurationError extends ArmatureError {
 }
 
 /// Thrown when a [Task] is called after it — or the owning [Store] —
-/// has been disposed.
+/// has been disposed, or surfaced through a pending future when
+/// `Task.reset()` cancels coalesced callers from `.latest`,
+/// `.debounce`, or `.throttle(trailing)`.
 final class TaskError extends ArmatureError {
   TaskError(super.message, {super.stackTrace});
 

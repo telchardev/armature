@@ -117,6 +117,24 @@ abstract class Store<TState extends Object?> {
   /// supersede-in-flight, `.debounce(d)` for coalescing rapid calls,
   /// `.throttle(d)` for rate-limited fire.
   ///
+  /// Pass [autoReset] to schedule an automatic transition back to
+  /// [TaskIdle] after the given duration has elapsed in [TaskDone] or
+  /// [TaskFailed]. The timer cancels and re-arms on every state
+  /// transition, so a fresh `call()` while the timer is waiting starts
+  /// a new lifecycle without flickering through [TaskIdle].
+  ///
+  /// **Picking `TError`** — the third generic gates which thrown values
+  /// land in [TaskFailed] (sticky, observable in UI) vs propagate from
+  /// `await task(...)` and revert state to [TaskIdle]. Common choices:
+  ///
+  /// * `Exception` — default for API / IO. Domain failures stick;
+  ///   `Error` subclasses (programming bugs) propagate.
+  /// * a domain class — only that family sticks; UI pattern-matches
+  ///   on specific cases.
+  /// * `Never` — nothing sticks; any throw escalates. Use when the
+  ///   fn isn't expected to fail in normal flow.
+  /// * `Object` — everything sticks. Last resort.
+  ///
   /// The task is owned by this store — [dispose] cascades to it,
   /// rejecting any in-flight calls with [TaskError].
   @protected
@@ -127,8 +145,13 @@ abstract class Store<TState extends Object?> {
   >({
     required TaskFn<TParams, TResult, TError> fn,
     TaskStrategy strategy = TaskStrategy.queue,
+    Duration? autoReset,
   }) {
-    final task = create<TParams, TResult, TError>(fn: fn, strategy: strategy);
+    final task = create<TParams, TResult, TError>(
+      fn: fn,
+      strategy: strategy,
+      autoReset: autoReset,
+    );
     _tasks.add(task);
     return task;
   }
@@ -138,14 +161,21 @@ abstract class Store<TState extends Object?> {
   /// preserved for parameterised tasks created via [createTask].
   ///
   /// [strategy] defaults to [TaskStrategy.queue]; accepts the same
-  /// variants as [createTask]. [dispose] cascades to this task too.
+  /// variants as [createTask]. Pass [autoReset] to schedule an
+  /// automatic transition back to [TaskIdle] after the given duration
+  /// in [TaskDone] / [TaskFailed]. [dispose] cascades to this task too.
   @protected
   VoidTask<TResult, TError>
   createVoidTask<TResult extends Object?, TError extends Object?>({
     required Future<TResult> Function() fn,
     TaskStrategy strategy = TaskStrategy.queue,
+    Duration? autoReset,
   }) {
-    final task = createVoid<TResult, TError>(fn: fn, strategy: strategy);
+    final task = createVoid<TResult, TError>(
+      fn: fn,
+      strategy: strategy,
+      autoReset: autoReset,
+    );
     _tasks.add(task);
     return task;
   }

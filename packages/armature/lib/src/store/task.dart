@@ -95,11 +95,15 @@ enum ThrottleEdge { leading, trailing }
 ///   * Initial value is [TaskIdle].
 ///   * Each `call(params)` transitions to [TaskPending(params)] for the
 ///     duration of the async work (with one exception: see debounce/throttle).
-///   * On success → [TaskDone(result)] (sticky until the next `call`).
+///   * On success → [TaskDone(result)] (sticky until the next `call`
+///     or `reset`).
 ///   * On error that matches `TError` → [TaskFailed(error)] (sticky).
 ///   * On error that does **not** match `TError` (unexpected runtime
 ///     failure) → reverts to [TaskIdle]; the original exception rethrows
 ///     from `call()` so the caller can handle it.
+///   * `Task.reset()` (manual or via `autoReset: duration`) → returns
+///     the state to [TaskIdle] from any sticky state and supersedes any
+///     in-flight run (its outcome no longer reaches [state]).
 ///
 /// Strategy-specific notes:
 ///
@@ -245,7 +249,14 @@ class Task<TParams, TResult, TError> {
 
   Future<void>? _queueTail;
 
-  int _latestRunId = 0;
+  /// Monotonic supersession token. Bumped by `.latest`'s `_callLatest`
+  /// (so superseded runs drop their writes) and by [_supersedeInFlight]
+  /// (so `dispose` / `reset` invalidate every in-flight run regardless
+  /// of strategy). Each `_executeFn` / `_runLatest` / `_fireDebounced`
+  /// / `_fireThrottleTrailing` captures the current value at entry
+  /// and skips state writes / completer settles when the captured
+  /// value no longer matches.
+  int _generation = 0;
   final List<Completer<TResult>> _latestPending = [];
 
   Timer? _debounceTimer;
@@ -265,9 +276,28 @@ class Task<TParams, TResult, TError> {
 
   final TaskStrategy _strategy;
 
-  Task._(TaskFn<TParams, TResult, TError> fn, TaskStrategy strategy)
-    : _fn = fn,
-      _strategy = strategy;
+  final Duration? _autoReset;
+  Timer? _autoResetTimer;
+  StateListenerDisposer? _autoResetDisposer;
+
+  Task._(
+    TaskFn<TParams, TResult, TError> fn,
+    TaskStrategy strategy, {
+    Duration? autoReset,
+  }) : _fn = fn,
+       _strategy = strategy,
+       _autoReset = autoReset {
+    if (_autoReset != null) {
+      _autoResetDisposer = _state.subscribe((_, next) {
+        _autoResetTimer?.cancel();
+        _autoResetTimer = null;
+        if (next is TaskDone<TParams, TResult, TError> ||
+            next is TaskFailed<TParams, TResult, TError>) {
+          _autoResetTimer = Timer(_autoReset, reset);
+        }
+      }, fireImmediately: false);
+    }
+  }
 
   /// Disposes the task's state listeners. In-flight calls still resolve
   /// normally (or reject with [TaskError] for coalesced/debounced work),
@@ -280,6 +310,55 @@ class Task<TParams, TResult, TError> {
     if (_disposed) return;
     _disposed = true;
 
+    _autoResetDisposer?.call();
+    _autoResetDisposer = null;
+    _autoResetTimer?.cancel();
+    _autoResetTimer = null;
+
+    _supersedeInFlight(TaskError('Task is disposed.'));
+
+    _state.dispose();
+  }
+
+  /// Returns the task to [TaskIdle], cancelling pending coalesced
+  /// callers and dropping state writes from any in-flight run. The
+  /// underlying fn keeps running to completion — Dart has no
+  /// cancellation primitive — but its outcome no longer reaches
+  /// [state] and no longer settles callers that subscribed before
+  /// the reset.
+  ///
+  /// Pending callers from `.latest`, `.debounce`, and
+  /// `.throttle(trailing)` reject with [TaskError]. The `.once` cache
+  /// is cleared so the next call re-executes the fn. Strategy-internal
+  /// timers (debounce quiet timer, throttle cooldown / window) are
+  /// cancelled; the `.queue` chain is broken so subsequent calls start
+  /// a fresh sequence.
+  ///
+  /// Silent no-op after [dispose] and from [TaskIdle] (where the state
+  /// transition is suppressed by equality, so subscribers don't fire).
+  void reset() {
+    if (_disposed) return;
+
+    _autoResetTimer?.cancel();
+    _autoResetTimer = null;
+
+    _supersedeInFlight(TaskError('Task was reset.'));
+
+    _state.state = TaskIdle<TParams, TResult, TError>();
+  }
+
+  /// Bumps `_generation` (so any in-flight runs drop their state writes
+  /// when they resume), cancels every strategy-internal timer, rejects
+  /// every pending coalesced caller with [error], and clears the
+  /// strategy-state buffers (`_callQueue`, `_queueTail`, `_called`,
+  /// debounce / throttle params).
+  ///
+  /// Shared between [dispose] and [reset]; the callers handle the bits
+  /// that differ — `_state.dispose()` vs writing [TaskIdle], and the
+  /// `autoReset` listener detach (only on `dispose`).
+  void _supersedeInFlight(TaskError error) {
+    ++_generation;
+
     _debounceTimer?.cancel();
     _debounceTimer = null;
     _throttleCooldown?.cancel();
@@ -287,28 +366,23 @@ class Task<TParams, TResult, TError> {
     _throttleTrailingWindow?.cancel();
     _throttleTrailingWindow = null;
 
-    final err = TaskError('Task is disposed.');
-    _settleIncompleteError(_debounceCompleter, err);
+    _settleIncompleteError(_debounceCompleter, error);
     _debounceCompleter = null;
-    _settleIncompleteError(_throttleTrailingCompleter, err);
+    _settleIncompleteError(_throttleTrailingCompleter, error);
     _throttleTrailingCompleter = null;
     for (final c in _latestPending) {
-      _settleIncompleteError(c, err);
+      _settleIncompleteError(c, error);
     }
     _latestPending.clear();
 
-    // Drop residual references so the disposed Task holds nothing
-    // beyond inert metadata. The `_has*Params` flags and the
-    // throttle future are defensive no-ops from here on; clearing
-    // them keeps the object's inspection-friendly for debug tools.
     _debouncePendingParams = null;
     _debouncePendingHasParams = false;
     _throttleTrailingParams = null;
     _throttleTrailingHasParams = false;
     _throttleLastFuture = null;
     _callQueue.clear();
-
-    _state.dispose();
+    _queueTail = null;
+    _called = false;
   }
 
   /// Invokes the task's underlying async function with [params],
@@ -339,7 +413,7 @@ class Task<TParams, TResult, TError> {
   }
 
   Future<TResult> _callOnce(TParams params) {
-    if (_called) {
+    if (_called && _state.state is TaskDone<TParams, TResult, TError>) {
       return Future.value(
         (_state.state as TaskDone<TParams, TResult, TError>).result,
       );
@@ -372,7 +446,7 @@ class Task<TParams, TResult, TError> {
   }
 
   Future<TResult> _callLatest(TParams params) {
-    final myRun = ++_latestRunId;
+    final myRun = ++_generation;
     final completer = Completer<TResult>();
     _latestPending.add(completer);
     unawaited(_runLatest(params, myRun));
@@ -381,12 +455,12 @@ class Task<TParams, TResult, TError> {
 
   /// Runs the `.latest`-strategy fn in a fire-and-forget future.
   /// Observes a [runId]-tagged supersession: only the run whose id
-  /// still matches [_latestRunId] on return is allowed to publish
+  /// still matches [_generation] on return is allowed to publish
   /// its outcome (both to [state] and to every pending caller).
   /// Superseded runs return silently — their result/error is dropped
   /// so the caller waits for the latest run instead.
   Future<void> _runLatest(TParams params, int runId) async {
-    if (runId == _latestRunId) {
+    if (runId == _generation) {
       _state.state = TaskPending<TParams, TResult, TError>(params);
     }
 
@@ -394,11 +468,11 @@ class Task<TParams, TResult, TError> {
 
     try {
       final result = await fnFuture;
-      if (runId != _latestRunId) return;
+      if (runId != _generation) return;
       _state.state = TaskDone<TParams, TResult, TError>(result);
       _flushLatestPending(result: result);
     } on Object catch (error, stackTrace) {
-      if (runId != _latestRunId) return;
+      if (runId != _generation) return;
       if (error is TError) {
         _state.state = TaskFailed<TParams, TResult, TError>(error as TError);
       } else if (_state.state is TaskPending<TParams, TResult, TError>) {
@@ -444,6 +518,7 @@ class Task<TParams, TResult, TError> {
     final completer = _debounceCompleter;
     if (completer == null || !_debouncePendingHasParams) return;
 
+    final myGen = _generation;
     final params = _debouncePendingParams as TParams;
     _debounceTimer = null;
     _debounceCompleter = null;
@@ -452,8 +527,16 @@ class Task<TParams, TResult, TError> {
 
     try {
       final result = await _executeFn(params);
+      if (myGen != _generation) {
+        _settleIncompleteError(completer, TaskError('Task was reset.'));
+        return;
+      }
       _settleIncompleteValue(completer, result);
     } on Object catch (error, stackTrace) {
+      if (myGen != _generation) {
+        _settleIncompleteError(completer, TaskError('Task was reset.'));
+        return;
+      }
       _settleIncompleteError(completer, error, stackTrace);
     }
   }
@@ -512,6 +595,7 @@ class Task<TParams, TResult, TError> {
       _throttleTrailingWindow = null;
       return;
     }
+    final myGen = _generation;
     final params = _throttleTrailingParams as TParams;
     _throttleTrailingWindow = null;
     _throttleTrailingCompleter = null;
@@ -520,29 +604,48 @@ class Task<TParams, TResult, TError> {
 
     try {
       final result = await _executeFn(params);
+      if (myGen != _generation) {
+        _settleIncompleteError(completer, TaskError('Task was reset.'));
+        return;
+      }
       _settleIncompleteValue(completer, result);
     } on Object catch (error, stackTrace) {
+      if (myGen != _generation) {
+        _settleIncompleteError(completer, TaskError('Task was reset.'));
+        return;
+      }
       _settleIncompleteError(completer, error, stackTrace);
     }
   }
 
   Future<TResult> _executeFn(TParams params) async {
+    // Capture the generation at entry so concurrent [reset] (which
+    // bumps `_generation`) supersedes this run's state writes — the
+    // fn keeps running and the caller still gets its result, but
+    // `state` no longer reflects an outcome the user explicitly
+    // discarded.
+    final myGen = _generation;
+
     // `Future.sync` captures synchronous throws from a non-async [_fn],
     // turning them into a rejected future so the try/finally below
     // still settles state and `_callQueue`.
     final fnFuture = Future<TResult>.sync(() => _fn(params));
 
     try {
-      _state.state = TaskPending<TParams, TResult, TError>(params);
+      if (myGen == _generation) {
+        _state.state = TaskPending<TParams, TResult, TError>(params);
+      }
       _callQueue.add(fnFuture);
 
       final result = await fnFuture;
 
-      _state.state = TaskDone<TParams, TResult, TError>(result);
-      _called = true;
+      if (myGen == _generation) {
+        _state.state = TaskDone<TParams, TResult, TError>(result);
+        _called = true;
+      }
       return result;
     } on Object catch (error) {
-      if (error is TError) {
+      if (error is TError && myGen == _generation) {
         // The `is TError` check guarantees the cast; the compiler
         // cannot promote through a generic type parameter, hence the
         // explicit `as`.
@@ -554,7 +657,10 @@ class Task<TParams, TResult, TError> {
 
       // If neither TaskDone nor TaskFailed landed (non-TError throw),
       // revert to TaskIdle so observers don't see a stale TaskPending.
-      if (_callQueue.isEmpty &&
+      // Gen guard prevents reverting state that a post-reset run is
+      // legitimately driving.
+      if (myGen == _generation &&
+          _callQueue.isEmpty &&
           _state.state is TaskPending<TParams, TResult, TError>) {
         _state.state = TaskIdle<TParams, TResult, TError>();
       }
@@ -581,8 +687,11 @@ class Task<TParams, TResult, TError> {
 /// Internally a thin subclass over `Task<void, TResult, TError>` that turns
 /// the required positional parameter into an optional one.
 class VoidTask<TResult, TError> extends Task<void, TResult, TError> {
-  VoidTask._(Future<TResult> Function() fn, TaskStrategy strategy)
-    : super._((_) => fn(), strategy);
+  VoidTask._(
+    Future<TResult> Function() fn,
+    TaskStrategy strategy, {
+    Duration? autoReset,
+  }) : super._((_) => fn(), strategy, autoReset: autoReset);
 
   @override
   Future<TResult> call([void params]) => super.call(null);
@@ -599,16 +708,19 @@ Task<TParams, TResult, TError> create<
 >({
   required TaskFn<TParams, TResult, TError> fn,
   required TaskStrategy strategy,
+  Duration? autoReset,
 }) {
-  return Task._(fn, strategy);
+  return Task._(fn, strategy, autoReset: autoReset);
 }
 
 /// Framework factory invoked by [Store.createVoidTask]. Not intended
 /// for direct use — see [create] for the rationale.
 @internal
-VoidTask<TResult, TError> createVoid<
-  TResult extends Object?,
-  TError extends Object?
->({required Future<TResult> Function() fn, required TaskStrategy strategy}) {
-  return VoidTask._(fn, strategy);
+VoidTask<TResult, TError>
+createVoid<TResult extends Object?, TError extends Object?>({
+  required Future<TResult> Function() fn,
+  required TaskStrategy strategy,
+  Duration? autoReset,
+}) {
+  return VoidTask._(fn, strategy, autoReset: autoReset);
 }

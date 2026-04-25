@@ -1,3 +1,4 @@
+import 'package:armature/armature.dart';
 import 'package:armature_flutter/armature_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -71,6 +72,7 @@ class _Buttons extends StatelessWidget {
         icon: const Icon(Icons.timer),
         label: const Text('Debounced bump (300ms)'),
       ),
+      _FlakyFetchButton(store: store),
     ];
 
     if (horizontal) {
@@ -90,6 +92,98 @@ class _Buttons extends StatelessWidget {
           children[i],
         ],
       ],
+    );
+  }
+}
+
+/// Demo button for `Task.autoReset` + typed-error snackbar pattern.
+///
+/// On tap, fires `store.flakyFetch` (50% fail rate). The state machine
+/// flickers `TaskIdle → TaskPending → TaskDone | TaskFailed` and the
+/// `autoReset: Duration(seconds: 3)` returns it to `TaskIdle`
+/// automatically, re-enabling the button. A subscribed listener shows
+/// a SnackBar on every settle so the user gets ephemeral feedback in
+/// addition to the in-button state.
+class _FlakyFetchButton extends StatefulWidget {
+  final CounterStore store;
+
+  const _FlakyFetchButton({required this.store});
+
+  @override
+  State<_FlakyFetchButton> createState() => _FlakyFetchButtonState();
+}
+
+class _FlakyFetchButtonState extends State<_FlakyFetchButton> {
+  void Function()? _disposeListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _disposeListener = widget.store.flakyFetch.subscribe((_, next) {
+      if (!mounted) return;
+      switch (next) {
+        case TaskDone(:final result):
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(result),
+              backgroundColor: Colors.green.shade600,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        case TaskFailed(:final error):
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text('Fetch failed: $error'),
+              backgroundColor: Colors.red.shade600,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        case TaskIdle() || TaskPending():
+        // No snackbar for idle / pending transitions.
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposeListener?.call();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StateObserver(
+      builder: (_) {
+        final state = widget.store.flakyFetch.state;
+        return switch (state) {
+          TaskIdle() => OutlinedButton.icon(
+            onPressed: () => widget.store.flakyFetch(),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('Fetch greeting (50% fail, autoReset 3s)'),
+          ),
+          TaskPending() => OutlinedButton.icon(
+            onPressed: null,
+            icon: const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            label: const Text('Fetching…'),
+          ),
+          TaskDone(:final result) => OutlinedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.check_circle, color: Colors.green),
+            label: Text('OK: $result'),
+          ),
+          TaskFailed(:final error) => OutlinedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.error_outline, color: Colors.red),
+            label: Text('Failed: $error'),
+          ),
+        };
+      },
     );
   }
 }

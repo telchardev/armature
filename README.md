@@ -66,8 +66,8 @@ Large Flutter applications quickly become a tangled mess of providers, singleton
 ```yaml
 # pubspec.yaml
 dependencies:
-  armature: ^0.3.0
-  armature_flutter: ^0.3.0
+  armature: ^0.3.1
+  armature_flutter: ^0.3.1
 ```
 
 ### 2. Define a feature
@@ -592,10 +592,10 @@ No API keys, no network — everything is in-process except the two `SharedPrefe
 
 | Package | Version | Dart SDK | Description |
 |---------|---------|----------|-------------|
-| [`armature`](https://pub.dev/packages/armature) | 0.3.0 | `^3.9.0` | Core framework — features, stores, tasks, ports |
-| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.3.0 | `^3.9.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
-| [`armature_reactive`](https://pub.dev/packages/armature_reactive) | 0.1.0 | `^3.9.0` | Reactive primitives — `Atom`, `Reaction` |
-| [`armature_graph`](https://pub.dev/packages/armature_graph) | 0.1.0 | `^3.9.0` | DAG resolver — topological ordering, visitor |
+| [`armature`](https://pub.dev/packages/armature) | 0.3.1   | `^3.9.0` | Core framework — features, stores, tasks, ports |
+| [`armature_flutter`](https://pub.dev/packages/armature_flutter) | 0.3.1   | `^3.9.0` | Flutter integration — `ArmatureApp`, slots, providers, debug overlay |
+| [`armature_reactive`](https://pub.dev/packages/armature_reactive) | 0.1.0   | `^3.9.0` | Reactive primitives — `Atom`, `Reaction` |
+| [`armature_graph`](https://pub.dev/packages/armature_graph) | 0.1.0   | `^3.9.0` | DAG resolver — topological ordering, visitor |
 
 ## License
 

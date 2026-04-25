@@ -113,6 +113,31 @@ class TasksContent extends StatelessWidget {
           'exceptions.',
         ),
         const CodeBlock(code: _errorSource, language: 'dart'),
+        const DocHeading('Picking TError'),
+        const DocParagraph(
+          'Four idioms cover most cases. The choice is architectural — '
+          'it decides where each thrown value goes (sticky in UI vs '
+          'propagated to the caller / error handler).',
+        ),
+        const DocBullet(
+          'TError = Exception (default for API/IO) — Exception '
+          'subclasses stick to TaskFailed; Errors (StateError, '
+          'RangeError, ...) propagate, so a programming bug doesn\'t '
+          'pollute the UI.',
+        ),
+        const DocBullet(
+          'TError = a domain class (e.g. ApiError, OrderError) — only '
+          'that family sticks. UI can pattern-match on specific cases.',
+        ),
+        const DocBullet(
+          'TError = Never — nothing sticks. Use when the fn is not '
+          'expected to throw in normal flow; any throw escalates.',
+        ),
+        const DocBullet(
+          'TError = Object — everything sticks, including bugs. Last '
+          'resort; loses the bug-vs-domain distinction.',
+        ),
+        const CodeBlock(code: _pickErrorSource, language: 'dart'),
         const DocHeading('Strategies at a glance'),
         const DocParagraph(
           'Every task declares a strategy at construction. The parameter '
@@ -150,6 +175,23 @@ class TasksContent extends StatelessWidget {
           'search-as-you-type, debounce for auto-save, once for lazy '
           'init, throttle for rate limits.',
         ),
+        const DocHeading('Reset'),
+        const DocParagraph(
+          'task.reset() returns the state to TaskIdle from any sticky '
+          'state, cancels coalesced callers (latest / debounce / '
+          'throttle(trailing)) with TaskError, drops state writes from '
+          'any in-flight run, and clears the once cache. Useful for '
+          'retry buttons, dismissing toast-style results, or re-arming '
+          'a once task after a transient failure.',
+        ),
+        const DocParagraph(
+          'For "show the result for a moment, then come back to the '
+          'idle button" UX, pass autoReset: duration at construction. '
+          'A timer schedules the same transition automatically after '
+          'TaskDone or TaskFailed and cancels itself if a new call() '
+          'arrives mid-window.',
+        ),
+        const CodeBlock(code: _resetSource, language: 'dart'),
         const DocHeading('Disposal'),
         const DocParagraph(
           'Tasks do not need manual cleanup. Store.dispose cascades to '
@@ -216,3 +258,59 @@ try {
   // Domain failure — also visible via store.fetchUser.state.
   showError(e);
 }''';
+
+const _resetSource = '''class UserStore extends Store<UserState> {
+  UserStore() : super(state: const UserState());
+
+  // After Done/Failed, return to TaskIdle 3s later so the button
+  // re-appears without manual intervention.
+  late final fetchUser = createTask<int, User, Exception>(
+    fn: (id) => api.getUser(id),
+    autoReset: const Duration(seconds: 3),
+  );
+}
+
+// In the UI: a manual retry button rendered alongside the failure.
+StateObserver(
+  builder: (_) {
+    final state = userStore.fetchUser.state;
+    return switch (state) {
+      TaskFailed(:final error) => Row(children: [
+        Text('Failed: \$error'),
+        TextButton(
+          onPressed: userStore.fetchUser.reset,
+          child: const Text('Retry'),
+        ),
+      ]),
+      _ => const SizedBox.shrink(),
+    };
+  },
+)''';
+
+const _pickErrorSource = '''// Default for API/IO calls.
+late final fetchUser = createTask<int, User, Exception>(
+  fn: (id) async => api.getUser(id),
+);
+
+// Typed exception hierarchy — switch can match specific cases.
+sealed class OrderError implements Exception {}
+class OutOfStock extends OrderError {}
+class PaymentDeclined extends OrderError {}
+
+late final placeOrder = createTask<OrderRequest, OrderId, OrderError>(
+  fn: (req) async => api.placeOrder(req),
+);
+
+// Strict — fn shouldn't fail in normal flow; any throw is a bug.
+late final increment = createVoidTask<int, Never>(
+  fn: () async => state.value + 1,
+);
+
+// In the UI:
+StateObserver(
+  builder: (_) => switch (orderStore.placeOrder.state) {
+    TaskFailed(error: OutOfStock()) => const Text('Sold out'),
+    TaskFailed(error: PaymentDeclined()) => const Text('Card declined'),
+    _ => const SizedBox.shrink(),
+  },
+)''';

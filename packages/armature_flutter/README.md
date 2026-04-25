@@ -13,8 +13,8 @@ feature-graph debug overlay.
 
 ```yaml
 dependencies:
-  armature: ^0.3.0
-  armature_flutter: ^0.3.0
+  armature: ^0.3.1
+  armature_flutter: ^0.3.1
 ```
 
 ## Quickstart

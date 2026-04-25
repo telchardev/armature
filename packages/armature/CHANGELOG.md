@@ -1,3 +1,56 @@
+## 0.3.1
+
+> Additive release: new public APIs on `Task` and `Cleanup`. No breaking
+> changes — `^0.3.0` consumers can adopt without code modifications.
+
+### Added
+
+- **`Task.reset()`** — public method that returns a task to `TaskIdle`
+  from any sticky state (`TaskDone` / `TaskFailed`). Supersedes any
+  in-flight run via a generation token (state writes from older runs
+  drop), cancels strategy-internal timers (debounce quiet timer,
+  throttle cooldown / window), rejects coalesced callers from
+  `.latest` / `.debounce` / `.throttle(trailing)` with `TaskError`,
+  and clears the `.once` cache so the next call re-executes the fn.
+  Silent no-op after `dispose` and from `TaskIdle`.
+- **`autoReset: Duration?`** parameter on `Store.createTask` /
+  `Store.createVoidTask` — schedules an automatic transition back to
+  `TaskIdle` after the given duration in `TaskDone` / `TaskFailed`.
+  The internal timer cancels and re-arms on every state transition,
+  so a fresh `call()` while the timer is waiting starts a new
+  lifecycle without flickering through `TaskIdle`. Cancelled in
+  `dispose()` and on manual `reset()`.
+- **`Cleanup.subscribe(store, listener, {fireImmediately})`** — sugar
+  for `cleanup.add(store.subscribe(listener, ...))`.
+- **`Cleanup.periodic(duration, callback)`** — wraps `Timer.periodic`
+  and auto-cancels the timer on deactivation.
+- **`Cleanup.listen(stream, onData, {onError, onDone, cancelOnError})`**
+  — wraps `Stream.listen(...)` and auto-cancels the subscription on
+  deactivation.
+
+### Changed
+
+- `CleanupBag` now `extends Cleanup` (was `implements Cleanup`) so the
+  new sugar helpers are inherited. Late-add semantics on the sealed
+  bag are preserved — sugar methods route through `add()`.
+- `TaskError` doc clarifies that the same error is also surfaced
+  through pending futures when `Task.reset()` cancels coalesced
+  callers (previously documented only for `dispose`).
+- README and `Store.createTask` docstring gain a "Picking TError"
+  guide (`Exception` / domain class / `Never` / `Object`) explaining
+  which thrown values land in `TaskFailed` vs propagate.
+
+### Internal
+
+- `_latestRunId` generalised into a cross-strategy `_generation`
+  supersession token. Every async path (`_executeFn` / `_runLatest`
+  / `_fireDebounced` / `_fireThrottleTrailing`) captures the token
+  at entry and skips state writes / completer settles when the
+  captured value no longer matches.
+- Extracted `_supersedeInFlight` helper shared between `dispose` and
+  `reset` for strategy-state teardown (timer cancel, completer
+  rejection, queue / debounce / throttle buffer clear).
+
 ## 0.3.0
 
 > Note: This release has breaking internal changes. User-facing API is

@@ -20,8 +20,8 @@ dependencies, eager store construction, and extension points
 
 ```yaml
 dependencies:
-  armature: ^0.3.0
-  armature_flutter: ^0.3.0   # if you want the Flutter integration
+  armature: ^0.3.1
+  armature_flutter: ^0.3.1   # if you want the Flutter integration
 ```
 
 ## Quickstart
@@ -162,6 +162,40 @@ Strategy-backed async operations. `strategy:` is optional —
 - `.debounce(duration)` — fires once after quiet period.
 - `.throttle(duration, edge)` — rate-limit with leading / trailing
   edge control.
+
+Lifecycle: `task.reset()` returns the state to `TaskIdle` (cancels
+coalesced callers from `.latest` / `.debounce` / `.throttle(trailing)`
+with `TaskError`, drops state writes from any in-flight run, clears
+the `.once` cache). Pass `autoReset: duration` at creation to schedule
+the same transition automatically after `TaskDone` / `TaskFailed`.
+
+**Picking `TError`** — the third generic decides which thrown values
+land in `TaskFailed` (sticky, observable in UI) vs propagate from
+`await task(...)` and revert state to `TaskIdle`:
+
+| `TError =` | Behaviour | When to use |
+|---|---|---|
+| `Exception` | `Exception` subclasses stick; `Error` propagates | Default for API / IO. Domain failures show in UI; programming bugs surface to the error handler. |
+| domain class (e.g. `ApiError`) | Only that family sticks | Strongly typed errors; UI pattern-matches on specific cases. |
+| `Never` | Nothing sticks | Task isn't expected to throw in normal flow — any throw is a bug. |
+| `Object` | Everything sticks, including bugs | Last resort. Loses the bug-vs-domain distinction. |
+
+```dart
+// Default for API/IO calls.
+late final fetchUser = createTask<int, User, Exception>(
+  fn: (id) async => api.getUser(id),
+);
+
+// Typed exception hierarchy.
+late final placeOrder = createTask<OrderRequest, OrderId, OrderError>(
+  fn: (req) async => api.placeOrder(req),
+);
+
+// Strict — fn shouldn't fail; any throw escalates to the caller.
+late final increment = createVoidTask<int, Never>(
+  fn: () async => state.value + 1,
+);
+```
 
 ### Error routing
 

@@ -1,3 +1,15 @@
+## 0.3.1
+
+> Docs and example refresh. No library code changes.
+
+### Changed
+
+- README updated to align terminology with the current API surface
+  (keyed slots, `.queue` / `asc` defaults, `package:armature/advanced.dart`
+  barrel, explicit `FeatureStatus` / `ToggleState`).
+- `example/example.dart` switches to the new `cleanup.subscribe(...)`
+  sugar from `armature` 0.3.1.
+
 ## 0.3.0
 
 ### Fixed
