@@ -96,11 +96,9 @@ final historyFeature =
       ..activation(whenActive(counterFeature))
       ..onStart((api, cleanup) {
         final counter = api.of(counterFeature).counter;
-        cleanup.add(
-          counter.subscribe((_, v) {
-            if (v != 0) api.own.history.push(v);
-          }),
-        );
+        cleanup.subscribe(counter, (_, v) {
+          if (v != 0) api.own.history.push(v);
+        });
       })
       ..usePipe(
         layoutFeature.ports.tabs,

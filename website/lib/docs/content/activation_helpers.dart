@@ -71,9 +71,10 @@ class ActivationHelpersContent extends StatelessWidget {
         const DocParagraph(
           'The helpers are just factories that return ActivationSetup '
           'closures. Write your own when the built-ins do not fit — '
-          'the contract is a function that subscribes its triggers, '
-          'registers disposers with cleanup.add(), and calls '
-          'toggle(ToggleState.active | .inactive) on every transition:',
+          'the contract is a function that subscribes its triggers '
+          '(with cleanup.subscribe / .listen / .periodic, or the '
+          'verbose cleanup.add) and calls toggle(ToggleState.active | '
+          '.inactive) on every transition:',
         ),
         const CodeBlock(code: _customSource, language: 'dart'),
         const DocHeading('What is next?'),
@@ -137,11 +138,11 @@ const _customSource =
     '''ActivationSetup whenOffline(AnyFeature networkFeature) {
   return (parentApi, toggle, cleanup) {
     final status = parentApi.of(networkFeature).status;
-    cleanup.add(status.subscribe((_, current) {
+    cleanup.subscribe(status, (_, current) {
       unawaited(toggle(
         current.isOffline ? ToggleState.active : ToggleState.inactive,
       ));
-    }, fireImmediately: true));
+    }, fireImmediately: true);
   };
 }
 

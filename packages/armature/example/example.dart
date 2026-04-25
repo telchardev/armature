@@ -85,11 +85,9 @@ final analyticsFeature =
       exports: (api) => api.own,
     )..onStart((api, cleanup) {
       final orders = api.of(ordersFeature).orders;
-      cleanup.add(
-        orders.subscribe((prev, curr) {
-          if (curr.length > prev.length) api.own.analytics.tick();
-        }),
-      );
+      cleanup.subscribe(orders, (prev, curr) {
+        if (curr.length > prev.length) api.own.analytics.tick();
+      });
     });
 
 /// Optional dependency on orders + an activation helper:
@@ -104,13 +102,11 @@ final auditFeature =
       )
       ..onStart((api, cleanup) {
         final orders = api.of(ordersFeature).orders;
-        cleanup.add(
-          orders.subscribe((prev, curr) {
-            if (curr.length > prev.length) {
-              print('[audit] new order: ${curr.last}');
-            }
-          }),
-        );
+        cleanup.subscribe(orders, (prev, curr) {
+          if (curr.length > prev.length) {
+            print('[audit] new order: ${curr.last}');
+          }
+        });
       })
       ..activation(
         whenStoreState(

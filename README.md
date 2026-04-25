@@ -193,16 +193,16 @@ For anything custom, drop to the imperative form:
 adminFeature
   ..activation((parentApi, toggle, cleanup) {
     final auth = parentApi.of(authFeature).auth;
-    cleanup.add(auth.subscribe((_, s) {
+    cleanup.subscribe(auth, (_, s) {
       toggle(s.user?.name == 'admin'
           ? ToggleState.active
           : ToggleState.inactive);
-    }, fireImmediately: true));
+    }, fireImmediately: true);
   })
   ..onStart((api, cleanup) async {
     final auth = api.of(authFeature).auth;
     // Per-activation work — `cleanup` runs LIFO on deactivation.
-    cleanup.add(auth.subscribe((_, s) => /* react */));
+    cleanup.subscribe(auth, (_, s) => /* react */);
   });
 ```
 

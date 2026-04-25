@@ -47,13 +47,11 @@ ActivationSetup whenStoreState<TExports, TState>({
 }) {
   return (parentApi, toggle, cleanup) {
     final target = store(parentApi.of(feature));
-    cleanup.add(
-      target.subscribe((_, state) {
-        unawaited(
-          toggle(predicate(state) ? ToggleState.active : ToggleState.inactive),
-        );
-      }, fireImmediately: true),
-    );
+    cleanup.subscribe(target, (_, state) {
+      unawaited(
+        toggle(predicate(state) ? ToggleState.active : ToggleState.inactive),
+      );
+    }, fireImmediately: true);
   };
 }
 
@@ -78,17 +76,15 @@ ActivationSetup whenStoreState<TExports, TState>({
 ActivationSetup whenActive(AnyFeature feature) {
   return (parentApi, toggle, cleanup) {
     final statusStore = parentApi.statusOf(feature);
-    cleanup.add(
-      statusStore.subscribe((_, status) {
-        unawaited(
-          toggle(
-            status == FeatureStatus.active
-                ? ToggleState.active
-                : ToggleState.inactive,
-          ),
-        );
-      }, fireImmediately: true),
-    );
+    cleanup.subscribe(statusStore, (_, status) {
+      unawaited(
+        toggle(
+          status == FeatureStatus.active
+              ? ToggleState.active
+              : ToggleState.inactive,
+        ),
+      );
+    }, fireImmediately: true);
   };
 }
 
@@ -106,17 +102,15 @@ ActivationSetup whenActive(AnyFeature feature) {
 ActivationSetup whenInactive(AnyFeature feature) {
   return (parentApi, toggle, cleanup) {
     final statusStore = parentApi.statusOf(feature);
-    cleanup.add(
-      statusStore.subscribe((_, status) {
-        unawaited(
-          toggle(
-            status != FeatureStatus.active
-                ? ToggleState.active
-                : ToggleState.inactive,
-          ),
-        );
-      }, fireImmediately: true),
-    );
+    cleanup.subscribe(statusStore, (_, status) {
+      unawaited(
+        toggle(
+          status != FeatureStatus.active
+              ? ToggleState.active
+              : ToggleState.inactive,
+        ),
+      );
+    }, fireImmediately: true);
   };
 }
 
@@ -147,7 +141,7 @@ ActivationSetup whenAllActive(List<AnyFeature> features) {
     }
 
     for (final store in stores) {
-      cleanup.add(store.subscribe((_, _) => reevaluate()));
+      cleanup.subscribe(store, (_, _) => reevaluate());
     }
     reevaluate();
   };

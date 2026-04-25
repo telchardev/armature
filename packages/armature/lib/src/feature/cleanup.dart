@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 
+import '../store/state.dart' show StateChangeListener;
+import '../store/store.dart' show Store;
+
 /// Bag of cleanup callbacks collected during `onStart`, executed in LIFO
 /// order on feature deactivation.
 ///
@@ -11,11 +14,16 @@ import 'package:meta/meta.dart';
 ///
 /// ```dart
 /// feature.onStart((api, cleanup) {
-///   final sub = api.of(other).store.subscribe(...);
-///   cleanup.add(sub);                  // sync disposer
+///   // The verbose form — works for any disposer:
+///   cleanup.add(api.of(other).store.subscribe(listener));
 ///
 ///   final ws = WebSocket.connect(url);
 ///   cleanup.add(ws.close);             // async disposer (Future<void>)
+///
+///   // For common patterns, prefer the typed helpers:
+///   cleanup.subscribe(api.own.counter, (prev, next) => /* ... */);
+///   cleanup.periodic(Duration(seconds: 30), () => api.own.data.refresh());
+///   cleanup.listen(eventStream, (event) => /* ... */);
 /// });
 /// ```
 ///
@@ -34,11 +42,60 @@ abstract class Cleanup {
   /// is invoked immediately. Late-add of an async disposer is
   /// fire-and-forget (the result is not awaited).
   void add(FutureOr<void> Function() disposer);
+
+  /// Subscribes [listener] to [store] and registers the cancel disposer
+  /// on this bag. Sugar for the common pattern
+  /// `cleanup.add(store.subscribe(listener, ...))`.
+  ///
+  /// [fireImmediately] forwards to [Store.subscribe]: when `true`, the
+  /// listener fires once during `subscribe` with `(current, current)` so
+  /// the caller can seed its side effect.
+  void subscribe<T>(
+    Store<T> store,
+    StateChangeListener<T> listener, {
+    bool fireImmediately = false,
+  }) {
+    add(store.subscribe(listener, fireImmediately: fireImmediately));
+  }
+
+  /// Schedules [callback] to fire every [duration] until the bag runs.
+  /// Wraps [Timer.periodic] and registers `timer.cancel` on this bag —
+  /// the timer is cancelled automatically on deactivation.
+  ///
+  /// Sugar for
+  /// `cleanup.add(Timer.periodic(duration, (_) => callback()).cancel)`.
+  /// For the rare case where the [Timer] argument is needed inside the
+  /// callback, drop to that verbose form.
+  void periodic(Duration duration, void Function() callback) {
+    final timer = Timer.periodic(duration, (_) => callback());
+    add(timer.cancel);
+  }
+
+  /// Subscribes to [stream] and registers the subscription's `cancel`
+  /// disposer on this bag. Every parameter mirrors [Stream.listen].
+  ///
+  /// Sugar for
+  /// `cleanup.add(stream.listen(onData, onError: ..., onDone: ..., cancelOnError: ...).cancel)`.
+  void listen<T>(
+    Stream<T> stream,
+    void Function(T data) onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    final subscription = stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+    add(subscription.cancel);
+  }
 }
 
 /// Default [Cleanup] implementation used by the framework.
 @internal
-final class CleanupBag implements Cleanup {
+final class CleanupBag extends Cleanup {
   final List<FutureOr<void> Function()> _disposers = [];
   bool _sealed = false;
   final void Function(Object error, StackTrace stack)? _onError;

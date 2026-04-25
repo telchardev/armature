@@ -18,8 +18,7 @@ final historyFeature =
       ..onStart((api, cleanup) {
         final counter = api.of(counterFeature).counter;
         final history = api.own.history;
-        final dispose = counter.subscribe((_, s) => history.push(s.value));
-        cleanup.add(dispose);
+        cleanup.subscribe(counter, (_, s) => history.push(s.value));
       })
       ..usePipe(layoutFeature.ports.tabsPipe, (tabs, _) {
         return [

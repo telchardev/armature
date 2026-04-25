@@ -69,11 +69,11 @@ adminFeature
   ..activation(whenActive(authFeature))
   ..onStart((api, cleanup) async {
     final auth = api.of(authFeature).auth;
-    cleanup.add(auth.subscribe((_, state) {
+    cleanup.subscribe(auth, (_, state) {
       if (state.user?.name == 'admin') {
         api.own.someStore.doWork();
       }
-    }));
+    });
   });
 ```
 

@@ -198,7 +198,8 @@ const _lifecycleSource = '''final adminFeature = createFeature(
 )
   ..activation((parentApi, toggle, cleanup) {
     // Gate on the session role — flip active/inactive as it changes.
-    final disposer = parentApi.of(authFeature).session.subscribe(
+    cleanup.subscribe(
+      parentApi.of(authFeature).session,
       (_, current) => toggle(
         current.role == Role.admin
             ? ToggleState.active
@@ -206,7 +207,6 @@ const _lifecycleSource = '''final adminFeature = createFeature(
       ),
       fireImmediately: true,
     );
-    cleanup.add(disposer);
   })
   ..onStart((api, cleanup) {
     api.own.panel.loadInitialData();
