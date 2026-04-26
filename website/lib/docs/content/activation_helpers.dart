@@ -74,7 +74,7 @@ class ActivationHelpersContent extends StatelessWidget {
           'the contract is a function that subscribes its triggers '
           '(with cleanup.subscribe / .listen / .periodic, or the '
           'verbose cleanup.add) and calls toggle(ToggleState.active | '
-          '.inactive) on every transition:',
+          'ToggleState.inactive) on every transition:',
         ),
         const CodeBlock(code: _customSource, language: 'dart'),
         const DocHeading('What is next?'),
@@ -86,6 +86,10 @@ class ActivationHelpersContent extends StatelessWidget {
           'ArmatureApp — where the errorHandler these setups report '
           'into is installed.',
         ),
+        const DocBullet(
+          'createFeatureRoot — mounts an activation-gated feature as '
+          'the root widget; the loader builder shows while pending.',
+        ),
       ],
     );
   }
@@ -94,45 +98,46 @@ class ActivationHelpersContent extends StatelessWidget {
 const _manualSource =
     '''// The feature never auto-activates. You keep the toggle reference
 // somewhere external (a debug panel, a remote config handler, a test).
-late FeatureToggle killSwitchToggle;
+late FeatureToggle betaToggle;
 
-final experimentalFeature = createFeature(
-  name: 'Experimental',
-  stores: (_) => (flag: ExperimentalFlagStore()),
+final betaNotesFeature = createFeature(
+  name: 'BetaNotes',
+  stores: (_) => (flag: BetaFlagStore()),
   exports: (api) => api.own,
 )..activation((parentApi, toggle, cleanup) {
-  killSwitchToggle = toggle;
+  betaToggle = toggle;
   return manualActivation()(parentApi, toggle, cleanup);
 });
 
 // Later, from anywhere:
-void enableExperiment() => killSwitchToggle(ToggleState.active);''';
+void enableBetaNotes() => betaToggle(ToggleState.active);''';
 
-const _whenStoreStateSource = '''final adminFeature = createFeature(
-  name: 'Admin',
-  dependsOn: [sessionFeature],
-  stores: (_) => (panel: AdminPanelStore()),
+const _whenStoreStateSource = '''final searchFeature = createFeature(
+  name: 'Search',
+  dependsOn: [notesFeature],
+  stores: (_) => (search: SearchStore()),
   exports: (api) => api.own,
 )..activation(whenStoreState(
-  feature: sessionFeature,
-  store: (exports) => exports.session,
-  predicate: (state) => state.user?.role == Role.admin,
+  feature: notesFeature,
+  store: (exports) => exports.notes,
+  // Search activates only when there is something to search.
+  predicate: (state) => state.items.isNotEmpty,
 ));''';
 
-const _whenActiveSource = '''final inspectorOverlayFeature = createFeature(
-  name: 'InspectorOverlay',
-  optionalDependsOn: [inspectorFeature],
-)..activation(whenActive(inspectorFeature));''';
+const _whenActiveSource = '''final analyticsFeature = createFeature(
+  name: 'Analytics',
+  optionalDependsOn: [searchFeature],
+)..activation(whenActive(searchFeature));''';
 
-const _whenInactiveSource = '''final loginPromptFeature = createFeature(
-  name: 'LoginPrompt',
-  optionalDependsOn: [sessionFeature],
-)..activation(whenInactive(sessionFeature));''';
+const _whenInactiveSource = '''final welcomeFeature = createFeature(
+  name: 'Welcome',
+  optionalDependsOn: [searchFeature],
+)..activation(whenInactive(searchFeature));''';
 
-const _whenAllActiveSource = '''final syncedFeature = createFeature(
-  name: 'SyncedData',
-  dependsOn: [networkFeature, sessionFeature],
-)..activation(whenAllActive([networkFeature, sessionFeature]));''';
+const _whenAllActiveSource = '''final syncFeature = createFeature(
+  name: 'Sync',
+  dependsOn: [networkFeature, notesFeature],
+)..activation(whenAllActive([networkFeature, notesFeature]));''';
 
 const _customSource =
     '''ActivationSetup whenOffline(AnyFeature networkFeature) {

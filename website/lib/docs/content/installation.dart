@@ -69,6 +69,10 @@ class InstallationContent extends StatelessWidget {
         ),
         const DocHeading('What is next?'),
         const DocBullet(
+          'Introduction — the same idea, extended to a Notes/Todo app '
+          'that the rest of the docs build on.',
+        ),
+        const DocBullet(
           'Features — the core building block once the packages are '
           'installed.',
         ),

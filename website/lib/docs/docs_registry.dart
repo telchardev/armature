@@ -8,21 +8,25 @@ import 'content/dependency_graph.dart';
 import 'content/error_model.dart';
 import 'content/feature_root.dart';
 import 'content/features.dart';
-import 'content/getting_started.dart';
+import 'content/glossary.dart';
 import 'content/installation.dart';
+import 'content/introduction.dart';
+import 'content/mental_model.dart';
 import 'content/multi_port_builder.dart';
 import 'content/ports.dart';
+import 'content/quickstart.dart';
 import 'content/slot_widgets.dart';
 import 'content/stores.dart';
 import 'content/tasks.dart';
-import 'content/when_to_use.dart';
 import 'docs_tree.dart';
 
 /// Maps a doc slug to its content widget. Slugs without a registered widget
 /// fall through to [ComingSoonContent].
 const Map<String, Widget> _registry = {
-  'when-to-use': WhenToUseContent(),
-  'getting-started': GettingStartedContent(),
+  'quickstart': QuickstartContent(),
+  'mental-model': MentalModelContent(),
+  'glossary': GlossaryContent(),
+  'introduction': IntroductionContent(),
   'installation': InstallationContent(),
   'features': FeaturesContent(),
   'dependency-graph': DependencyGraphContent(),

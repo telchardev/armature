@@ -21,7 +21,7 @@ class AppRouter {
               pageBuilder: (_, _) =>
                   const NoTransitionPage(child: LandingPage()),
             ),
-            GoRoute(path: '/docs', redirect: (_, _) => '/docs/getting-started'),
+            GoRoute(path: '/docs', redirect: (_, _) => '/docs/quickstart'),
             GoRoute(
               path: '/docs/:slug',
               pageBuilder: (_, state) => NoTransitionPage(

@@ -5,16 +5,9 @@
 [![points](https://img.shields.io/pub/points/armature?logo=dart)](https://pub.dev/packages/armature/score)
 [![CI](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml/badge.svg?branch=main)](https://github.com/telchardev/armature/actions/workflows/armature_ci.yml)
 
-Feature-based application framework with dependency-graph resolution,
-reactive stores, typed ports (`Pipe` / `Behavior` / slots), and tasks.
-**Pure Dart**; pair with
-[`armature_flutter`](https://pub.dev/packages/armature_flutter) for
-Flutter UI.
+Feature-based application framework with dependency-graph resolution, reactive stores, typed ports (`Pipe` / `Behavior` / Slots), and tasks. **Pure Dart**; pair with [`armature_flutter`](https://pub.dev/packages/armature_flutter) for Flutter UI.
 
-Large applications quickly devolve into a web of providers and
-singletons. `armature` solves this by giving each feature explicit
-dependencies, eager store construction, and extension points
-(ports) that other features plug into without mutual knowledge.
+Large applications quickly devolve into a web of providers and singletons. `armature` solves this by giving each feature explicit dependencies, eager store construction, and extension points (ports) that other features plug into without mutual knowledge.
 
 ## Install
 
@@ -26,7 +19,7 @@ dependencies:
 
 ## Quickstart
 
-### Define a feature
+A self-contained Pure Dart "hello world" with two features composing through a dependency. The Logger feature subscribes to the Counter feature's store and prints every change.
 
 ```dart
 import 'package:armature/armature.dart';
@@ -35,110 +28,76 @@ typedef CounterState = ({int value});
 
 class CounterStore extends Store<CounterState> {
   CounterStore() : super(state: (value: 0));
-
   void increment() => update((s) => (value: s.value + 1));
 }
 
 final counterFeature = createFeature(
-  name: "Counter",
+  name: 'Counter',
   stores: (_) => (counter: CounterStore()),
-  exports: (api) => api.own, // pass-through — children see { counter }
-);
-```
-
-### Declare dependencies
-
-```dart
-final authFeature = createFeature(
-  name: "Auth",
-  stores: (_) => (auth: AuthStore()),
   exports: (api) => api.own,
 );
 
-final adminFeature = createFeature(
-  name: "Admin",
-  dependsOn: [authFeature],        // required parent
-  optionalDependsOn: [counterFeature], // optional — reachable via `api.of`
-);
+// A second feature observes the counter through the dependency edge.
+final loggerFeature = createFeature(
+  name: 'Logger',
+  dependsOn: [counterFeature],
+)..onStart((api, cleanup) {
+  final counter = api.of(counterFeature).counter;
+  cleanup.subscribe(
+    counter,
+    (_, s) => print('counter: ${s.value}'),
+    fireImmediately: true,
+  );
+  counter.increment();
+  counter.increment();
+});
+
+Future<void> main() async {
+  final container = AppContainer(
+    features: [counterFeature, loggerFeature],
+  );
+  await container.start();
+  // Logger prints: counter: 0, counter: 1, counter: 2
+  await container.stop();
+}
 ```
 
-### Activate + react
-
-```dart
-adminFeature
-  ..activation(whenActive(authFeature))
-  ..onStart((api, cleanup) async {
-    final auth = api.of(authFeature).auth;
-    cleanup.subscribe(auth, (_, state) {
-      if (state.user?.name == 'admin') {
-        api.own.someStore.doWork();
-      }
-    });
-  });
-```
-
-### Run the container
-
-```dart
-final container = AppContainer(
-  features: [authFeature, counterFeature, adminFeature],
-  options: ContainerOptions(
-    errorHandler: ({required source, required error, required meta}) {
-      // source = feature name / '<container>' / '<events>'
-      logger.warn('[$source] $error');
-    },
-  ),
-);
-
-await container.start();
-// ...later:
-await container.dispose();
-```
+For the Flutter integration (`ArmatureApp`, slot widgets, `StoreBuilder`/`StoreSelector`, debug overlay), see [`armature_flutter`](https://pub.dev/packages/armature_flutter).
 
 ## Core concepts
 
 ### Features
 
-- **`createFeature({name, dependsOn, optionalDependsOn, stores, exports, ports})`** —
-  the sole constructor. Store / export factories are records-based:
-  `(counter: CounterStore(), repo: NotesStore())`.
-- **Lifecycle** — `disabled` → `pending` → `active` → back to
-  `disabled`. Stores are constructed eagerly during `start()`; only
-  `onStart` reruns on activation cycles.
-- **Activation helpers** — `manualActivation`, `whenActive(parent)`,
-  `whenInactive(parent)`, `whenAllActive([...])`, `whenStoreState(...)`.
+- **`createFeature({name, dependsOn, optionalDependsOn, stores, exports, ports})`** — the sole constructor. Store / export factories are records-based: `(counter: CounterStore(), repo: NotesStore())`.
+- **Lifecycle** — `disabled` → `pending` → `active` → back to `disabled`. Stores are constructed eagerly during `start()`; only `onStart` reruns on activation cycles.
+- **Activation helpers** — `manualActivation`, `whenActive(parent)`, `whenInactive(parent)`, `whenAllActive([...])`, `whenStoreState(...)`.
 
 ### Stores
 
-`Store<T>` wraps reactive state with listeners, async tasks, and
-structural integration into the feature's `scopeApi`.
+`Store<T>` wraps reactive state with listeners, async tasks, and structural integration into the feature's `scopeApi`.
 
 ```dart
-class AuthStore extends Store<({User? user})> {
-  AuthStore() : super(state: (user: null));
+typedef NotesState = ({List<String> items});
 
-  late final login = createTask(
-    fn: (String name) async {
-      await Future.delayed(const Duration(milliseconds: 200));
-      update((_) => (user: (name: name)));
-    },
+class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
+
+  void add(String text) => update((s) => (items: [...s.items, text]));
+
+  late final persist = createVoidTask(
+    fn: () async => await db.write(state.items),
+    strategy: TaskStrategy.debounce(Duration(milliseconds: 300)),
   );
-
-  void logout() => update((_) => (user: null));
 }
 ```
 
 ### Ports
 
-Extension points that other features plug into. Three kinds in
-`armature` core:
+Extension points that other features plug into. Three kinds in `armature` core:
 
-- **`Pipe<T>`** — sequential transformation. Each active handler
-  receives the previous value, returns the next.
-- **`Behavior<TBranch, TPayload>`** — priority-based selection. Active
-  handlers return `BehaviorDescriptor(...)`; highest priority wins.
-- **Slots** (`SingleSlot` / `MultiSlot`) — Flutter widgets; live in
-  `armature_flutter`.
+- **`Pipe<T>`** — sequential transformation. Each active handler receives the previous value, returns the next.
+- **`Behavior<TBranch, TPayload>`** — priority-based selection. Active handlers return `BehaviorDescriptor(...)`; highest priority wins.
+- **Slots** (`SingleSlot` / `MultiSlot`) — Flutter widgets; live in `armature_flutter`.
 
 ```dart
 // In owner's ports record:
@@ -153,25 +112,17 @@ nightFeature.useBehavior(layoutFeature.ports.themeBehavior, (api) {
 
 ### Tasks
 
-Strategy-backed async operations. `strategy:` is optional —
-`Store.createTask` / `createVoidTask` default to `.queue`.
+Strategy-backed async operations. `strategy:` is optional — `Store.createTask` / `createVoidTask` default to `.queue`.
 
 - `.queue` **(default)** — FIFO sequential queue.
 - `.once` — blocks concurrent invocations until done.
 - `.latest` — only the most recent input finishes.
 - `.debounce(duration)` — fires once after quiet period.
-- `.throttle(duration, edge)` — rate-limit with leading / trailing
-  edge control.
+- `.throttle(duration, edge)` — rate-limit with leading / trailing edge control.
 
-Lifecycle: `task.reset()` returns the state to `TaskIdle` (cancels
-coalesced callers from `.latest` / `.debounce` / `.throttle(trailing)`
-with `TaskError`, drops state writes from any in-flight run, clears
-the `.once` cache). Pass `autoReset: duration` at creation to schedule
-the same transition automatically after `TaskDone` / `TaskFailed`.
+Lifecycle: `task.reset()` returns the state to `TaskIdle` (cancels coalesced callers from `.latest` / `.debounce` / `.throttle(trailing)` with `TaskError`, drops state writes from any in-flight run, clears the `.once` cache). Pass `autoReset: duration` at creation to schedule the same transition automatically after `TaskDone` / `TaskFailed`.
 
-**Picking `TError`** — the third generic decides which thrown values
-land in `TaskFailed` (sticky, observable in UI) vs propagate from
-`await task(...)` and revert state to `TaskIdle`:
+**Picking `TError`** — the third generic decides which thrown values land in `TaskFailed` (sticky, observable in UI) vs propagate from `await task(...)` and revert state to `TaskIdle`:
 
 | `TError =` | Behaviour | When to use |
 |---|---|---|
@@ -208,36 +159,24 @@ Everything user-actionable reaches `ContainerOptions.errorHandler`:
 | Listener throw on `portChanged` | `ListenerError` | `'<events>'` |
 | Port mis-scoped apply | `PortError` | feature name |
 | Slot widget build throw | `RenderError` | feature name |
-| `onDispose` callback throw | `HandlerError` | `'<container>'` |
 
 ## Advanced surface
 
-`package:armature/armature.dart` exposes the ~25 symbols you need to
-author features, stores, tasks, and ports. Framework plumbing —
-handler / listener typedefs (`BehaviorHandler`, `PipeHandler`,
-`TaskFn`, `StateChangeListener`, ...), port base classes (`Port`,
-`AnyPort`, `PortType`, `PortSubscription`), individual
-`TaskStrategy*` constructor classes, debug-overlay mirrors, and
-`LoggerDebugInfo` — lives in a separate barrel:
+`package:armature/armature.dart` exposes the ~25 symbols you need to author features, stores, tasks, and ports. Framework plumbing — handler / listener typedefs (`BehaviorHandler`, `PipeHandler`, `TaskFn`, `StateChangeListener`, ...), port base classes (`Port`, `AnyPort`, `PortType`, `PortSubscription`), individual `TaskStrategy*` constructor classes, debug-overlay mirrors, and `LoggerDebugInfo` — lives in a separate barrel:
 
 ```dart
 import 'package:armature/advanced.dart';
 ```
 
-Reach for it when you need to type-annotate a handler field, build a
-custom debug overlay, or extend the framework. Day-to-day feature /
-store code should not need this import.
+Reach for it when you need to type-annotate a handler field, build a custom debug overlay, or extend the framework. Day-to-day feature / store code should not need this import.
 
 ## Learn more
 
-- [`armature_flutter`](https://pub.dev/packages/armature_flutter) — Flutter
-  integration: `ArmatureApp`, slot widgets, providers, debug overlay.
-- [`armature_reactive`](https://pub.dev/packages/armature_reactive) —
-  underlying reactive primitives.
-- [`armature_graph`](https://pub.dev/packages/armature_graph) — DAG
-  resolver used for dependency graph.
-- [Monorepo README](https://github.com/telchardev/armature) — full
-  architecture reference with extended examples.
+- 📖 **[Documentation site](https://telchardev.github.io/armature/)** — full guide with mental model, glossary, and a Notes/Todo example that builds out every concept.
+- [`armature_flutter`](https://pub.dev/packages/armature_flutter) — Flutter integration: `ArmatureApp`, slot widgets, providers, debug overlay.
+- [`armature_reactive`](https://pub.dev/packages/armature_reactive) — underlying reactive primitives.
+- [`armature_graph`](https://pub.dev/packages/armature_graph) — DAG resolver used for dependency graph.
+- [examples/armature_example](https://github.com/telchardev/armature/tree/main/examples/armature_example) — multi-feature reference app.
 
 ## License
 

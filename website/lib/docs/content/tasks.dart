@@ -126,7 +126,7 @@ class TasksContent extends StatelessWidget {
           'pollute the UI.',
         ),
         const DocBullet(
-          'TError = a domain class (e.g. ApiError, OrderError) — only '
+          'TError = a domain class (e.g. PersistError, NotFound) — only '
           'that family sticks. UI can pattern-match on specific cases.',
         ),
         const DocBullet(
@@ -170,10 +170,9 @@ class TasksContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const DocParagraph(
-          'The Stores page shows the syntax for each. A common rule of '
-          'thumb: queue for mutating actions, latest for '
-          'search-as-you-type, debounce for auto-save, once for lazy '
-          'init, throttle for rate limits.',
+          'A common rule of thumb: queue for mutating actions (add note), '
+          'latest for search-as-you-type, debounce for auto-save (persist), '
+          'once for lazy init (load), throttle for rate limits.',
         ),
         const DocHeading('Reset'),
         const DocParagraph(
@@ -210,6 +209,10 @@ class TasksContent extends StatelessWidget {
           'Error model — how TaskFailed relates to the framework\'s '
           'wider HandlerError / RenderError routing.',
         ),
+        const DocBullet(
+          'ArmatureApp — where errorHandler (the sink for unmatched '
+          'task throws) is installed.',
+        ),
       ],
     );
   }
@@ -217,55 +220,57 @@ class TasksContent extends StatelessWidget {
 
 const _observeSource = '''StateObserver(
   builder: (_) {
-    final state = userStore.fetchUser.state;
+    final state = notesStore.load.state;
     return switch (state) {
       TaskIdle() => FilledButton(
-          onPressed: () => userStore.fetchUser(42),
-          child: const Text('Load'),
+          onPressed: () => notesStore.load(),
+          child: const Text('Load notes'),
         ),
       TaskPending() => const FilledButton(
           onPressed: null,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
-      TaskDone(:final result) => Text('Loaded \${result.name}'),
-      TaskFailed(:final error) => Text('Failed: \$error'),
+      TaskDone() => Text('\${notesStore.state.items.length} notes loaded'),
+      TaskFailed(:final error) => Text('Failed to load: \$error'),
     };
   },
 )''';
 
-const _errorSource = '''class UserStore extends Store<UserState> {
-  UserStore() : super(state: (name: null, age: 0));
+const _errorSource = '''class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
 
-  // TError = Exception — ApiException and friends land in TaskFailed.
+  // TError = Exception — IOException and friends land in TaskFailed.
   // Programming errors (StateError, RangeError, ...) rethrow to caller.
-  late final fetchUser = createTask<int, User, Exception>(
-    fn: (id) async {
+  late final load = createVoidTask<void, Exception>(
+    fn: () async {
       try {
-        return await api.getUser(id);
-      } on ApiException {
+        final items = await db.readAll();
+        state = (items: items);
+      } on IOException {
         rethrow;
       }
     },
-    strategy: TaskStrategy.latest,
+    strategy: TaskStrategy.once,
   );
 }
 
 // Call site:
 try {
-  final user = await store.fetchUser(42);
-  // ... handle user
-} on ApiException catch (e) {
-  // Domain failure — also visible via store.fetchUser.state.
+  await store.load();
+} on IOException catch (e) {
+  // Domain failure — also visible via store.load.state.
   showError(e);
 }''';
 
-const _resetSource = '''class UserStore extends Store<UserState> {
-  UserStore() : super(state: const UserState());
+const _resetSource = '''class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
 
   // After Done/Failed, return to TaskIdle 3s later so the button
   // re-appears without manual intervention.
-  late final fetchUser = createTask<int, User, Exception>(
-    fn: (id) => api.getUser(id),
+  late final load = createVoidTask<void, Exception>(
+    fn: () async {
+      state = (items: await db.readAll());
+    },
     autoReset: const Duration(seconds: 3),
   );
 }
@@ -273,12 +278,12 @@ const _resetSource = '''class UserStore extends Store<UserState> {
 // In the UI: a manual retry button rendered alongside the failure.
 StateObserver(
   builder: (_) {
-    final state = userStore.fetchUser.state;
+    final state = notesStore.load.state;
     return switch (state) {
       TaskFailed(:final error) => Row(children: [
         Text('Failed: \$error'),
         TextButton(
-          onPressed: userStore.fetchUser.reset,
+          onPressed: notesStore.load.reset,
           child: const Text('Retry'),
         ),
       ]),
@@ -288,29 +293,29 @@ StateObserver(
 )''';
 
 const _pickErrorSource = '''// Default for API/IO calls.
-late final fetchUser = createTask<int, User, Exception>(
-  fn: (id) async => api.getUser(id),
+late final load = createVoidTask<void, Exception>(
+  fn: () async => state = (items: await db.readAll()),
 );
 
 // Typed exception hierarchy — switch can match specific cases.
-sealed class OrderError implements Exception {}
-class OutOfStock extends OrderError {}
-class PaymentDeclined extends OrderError {}
+sealed class PersistError implements Exception {}
+class DiskFull extends PersistError {}
+class PermissionDenied extends PersistError {}
 
-late final placeOrder = createTask<OrderRequest, OrderId, OrderError>(
-  fn: (req) async => api.placeOrder(req),
+late final persist = createVoidTask<void, PersistError>(
+  fn: () async => await db.writeAll(state.items),
 );
 
 // Strict — fn shouldn't fail in normal flow; any throw is a bug.
-late final increment = createVoidTask<int, Never>(
-  fn: () async => state.value + 1,
+late final clearAll = createVoidTask<void, Never>(
+  fn: () async => state = (items: const []),
 );
 
 // In the UI:
 StateObserver(
-  builder: (_) => switch (orderStore.placeOrder.state) {
-    TaskFailed(error: OutOfStock()) => const Text('Sold out'),
-    TaskFailed(error: PaymentDeclined()) => const Text('Card declined'),
+  builder: (_) => switch (notesStore.persist.state) {
+    TaskFailed(error: DiskFull()) => const Text('Disk is full'),
+    TaskFailed(error: PermissionDenied()) => const Text('Permission denied'),
     _ => const SizedBox.shrink(),
   },
 )''';

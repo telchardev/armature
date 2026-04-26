@@ -31,8 +31,8 @@ class PortsContent extends StatelessWidget {
         ),
         const DocBullet(
           'Behavior — the highest-priority contributor wins. Use for '
-          'branching decisions: auth gates, routing rules, variant '
-          'selection.',
+          'branching decisions: sort order, formatting variant, '
+          'authentication gates.',
         ),
         const DocBullet(
           'Slot — same selection as Behavior, but the value is a '
@@ -47,7 +47,7 @@ class PortsContent extends StatelessWidget {
         ),
         const DocParagraph('The owner declares the port and an initial value:'),
         const CodeBlock(code: _pipeOwnerSource, language: 'dart'),
-        const DocParagraph('A dependent feature contributes:'),
+        const DocParagraph('Dependent features contribute:'),
         const CodeBlock(code: _pipeUseSource, language: 'dart'),
         const DocParagraph(
           'Order matters — the pipe runs handlers in registration order. '
@@ -127,10 +127,10 @@ class PortsContent extends StatelessWidget {
 }
 
 const _pipeOwnerSource =
-    '''// ports.dart — port instances live alongside the feature.
+    '''// layout/ports.dart — port instances live alongside the feature.
 final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
 
-// config.dart — wire them into the feature as a record.
+// layout/config.dart — wire them into the feature as a record.
 final layoutFeature = createFeature(
   name: 'Layout',
   ports: (tabsPipe: tabsPipe),
@@ -138,28 +138,38 @@ final layoutFeature = createFeature(
   exports: (api) => api.own,
 );''';
 
-const _pipeUseSource = '''..usePipe(layoutFeature.ports.tabsPipe, (tabs, _) => [
+const _pipeUseSource = '''// notesFeature contributes a Notes tab.
+notesFeature.usePipe(layoutFeature.ports.tabsPipe, (tabs, _) => [
   ...tabs,
-  (id: 'counter', label: 'Counter', icon: Icons.add),
-])''';
+  (id: 'notes', label: 'Notes', icon: Icons.note),
+]);
 
-const _behaviorOwnerSource = '''enum AuthBranch { guest, authed }
+// searchFeature adds a Search tab on top of whatever notes contributed.
+searchFeature.usePipe(layoutFeature.ports.tabsPipe, (tabs, _) => [
+  ...tabs,
+  (id: 'search', label: 'Search', icon: Icons.search),
+]);''';
 
-final authBehavior = createBehavior<AuthBranch, String?>(name: 'auth.gate');
+const _behaviorOwnerSource = '''enum SortMode { byDate, byTitle, custom }
 
-final authFeature = createFeature(
-  name: 'Auth',
-  ports: (authBehavior: authBehavior),
-  stores: (_) => (session: SessionStore()),
+final sortBehavior = createBehavior<SortMode, Comparator<Note>>(
+  name: 'notes.sort',
+);
+
+final notesFeature = createFeature(
+  name: 'Notes',
+  ports: (sortBehavior: sortBehavior),
+  stores: (_) => (notes: NotesStore()),
   exports: (api) => api.own,
 );''';
 
-const _behaviorUseSource = '''..useBehavior(
-  authFeature.ports.authBehavior,
+const _behaviorUseSource =
+    '''// settingsFeature lets the user pick a sort mode; high priority wins.
+..useBehavior(
+  notesFeature.ports.sortBehavior,
   (api) {
-    final session = api.of(authFeature).session.state;
-    if (session.user == null) return null;
-    return (branch: AuthBranch.authed, payload: session.user!.id);
+    final mode = api.own.settings.state.sortMode;
+    return (branch: mode, payload: comparators[mode]!);
   },
   priority: 10,
 )''';
@@ -175,9 +185,10 @@ final layoutFeature = createFeature(
 );''';
 
 const _slotUseSource = '''..useMultiSlot(layoutFeature.ports.fabSlot, (_, api) {
-  if (api.of(layoutFeature).activeTab.state != 'counter') return null;
+  // Only show the "add note" FAB on the Notes tab.
+  if (api.of(layoutFeature).activeTab.state != 'notes') return null;
   return FloatingActionButton(
-    onPressed: () => api.own.counter.increment(),
+    onPressed: () => api.own.notes.add('New note'),
     child: const Icon(Icons.add),
   );
 }, order: 1)''';

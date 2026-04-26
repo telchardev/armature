@@ -17,16 +17,12 @@ typedef SingleSlotWidgetBuilder =
 /// selected handler's widget or its tracked atoms change. The builder
 /// receives the winning child widget (or `null`) and typically wraps it
 /// in a layout widget.
-class SingleSlotProvider<
-  TInputData,
-  TSlot extends SingleSlot<TInputData, SingleSlotHandler<TInputData>>
->
-    extends StatefulWidget {
+class SingleSlotProvider<TInputData> extends StatefulWidget {
   final SingleSlotWidgetBuilder builder;
 
   final TInputData data;
 
-  final TSlot slot;
+  final SingleSlot<TInputData, SingleSlotHandler<TInputData>> slot;
 
   const SingleSlotProvider({
     super.key,
@@ -36,20 +32,13 @@ class SingleSlotProvider<
   });
 
   @override
-  State<SingleSlotProvider<TInputData, TSlot>> createState() =>
-      _SingleSlotProviderState<TInputData, TSlot>();
+  State<SingleSlotProvider<TInputData>> createState() =>
+      _SingleSlotProviderState<TInputData>();
 }
 
-class _SingleSlotProviderState<
-  TInputData,
-  TSlot extends SingleSlot<TInputData, SingleSlotHandler<TInputData>>
->
+class _SingleSlotProviderState<TInputData>
     extends
-        PortProviderState<
-          Widget?,
-          TInputData,
-          SingleSlotProvider<TInputData, TSlot>
-        > {
+        PortProviderState<Widget?, TInputData, SingleSlotProvider<TInputData>> {
   @override
   Widget? get fallbackValue => null;
 
@@ -68,7 +57,7 @@ class _SingleSlotProviderState<
   }
 
   @override
-  void didUpdateWidget(SingleSlotProvider<TInputData, TSlot> oldWidget) {
+  void didUpdateWidget(SingleSlotProvider<TInputData> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.slot != oldWidget.slot) {

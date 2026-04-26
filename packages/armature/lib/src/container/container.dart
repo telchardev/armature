@@ -36,7 +36,23 @@ import './feature_orchestrator.dart' show FeatureOrchestrator;
 import './port_subscription.dart' show PortSubscription;
 
 /// Lifecycle status of a [AppContainer].
-enum ContainerStatus { idle, starting, working, disposed }
+enum ContainerStatus {
+  /// Constructed but `start()` has not been called yet — features are
+  /// declared, no resolution or activation has happened.
+  idle,
+
+  /// `start()` is in progress: the dependency graph is being built and
+  /// the initial activation cascade is running.
+  starting,
+
+  /// `start()` finished successfully; features can be toggled, ports
+  /// invoked, and tasks dispatched.
+  working,
+
+  /// `dispose()` has been called; the container is permanently torn
+  /// down and most APIs throw [ContainerUsageError].
+  disposed,
+}
 
 /// Error handler callback for recoverable feature errors.
 ///

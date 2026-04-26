@@ -73,9 +73,10 @@ class StoresContent extends StatelessWidget {
         ),
         const CodeBlock(code: _taskSource, language: 'dart'),
         const DocParagraph(
-          'Calling fetchUser(42) returns a Future that resolves with the '
-          'loaded user; observers watching the task state see the full '
-          'lifecycle in order.',
+          'Calling load() returns a Future that resolves once the load '
+          'finishes; observers watching the task state see the full '
+          'lifecycle in order. persist runs as a side effect of every '
+          'add/remove (it is debounced — see below).',
         ),
         const DocHeading('Task strategies'),
         const DocParagraph(
@@ -85,8 +86,8 @@ class StoresContent extends StatelessWidget {
         ),
         const DocBullet(
           'queue (default) — serialises calls FIFO; each waits for the '
-          'previous to complete. Good for ordered mutations like a counter '
-          'increment.',
+          'previous to complete. Good for ordered mutations like adding '
+          'a note.',
         ),
         const DocBullet(
           'once — runs a single time; later calls return the cached result '
@@ -100,7 +101,7 @@ class StoresContent extends StatelessWidget {
         const DocBullet(
           'debounce(d) — coalesces bursts; the function fires once after '
           'the last call, using the most recent arguments. Good for '
-          'auto-save or typing-settled effects.',
+          'auto-save (persist after the user stops typing).',
         ),
         const DocBullet(
           'throttle(d) — rate-limits. Leading edge fires immediately and '
@@ -135,55 +136,64 @@ class StoresContent extends StatelessWidget {
   }
 }
 
-const _declareSource = '''typedef UserState = ({String? name, int age});
+const _declareSource = '''typedef Note = ({String id, String text});
+typedef NotesState = ({List<Note> items});
 
-class UserStore extends Store<UserState> {
-  UserStore() : super(state: (name: null, age: 0));
+class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
 }''';
 
 const _observerSource = '''StateObserver(
   builder: (_) {
-    final state = userStore.state;
-    return Text(state.name ?? 'anonymous');
+    final state = notesStore.state;
+    return Text('\${state.items.length} notes');
   },
 )''';
 
-const _writeSource = '''class UserStore extends Store<UserState> {
-  UserStore() : super(state: (name: null, age: 0));
+const _writeSource = '''class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
 
-  void rename(String name) {
-    state = (name: name, age: state.age);
+  void add(String text) {
+    final id = 'n\${state.items.length}';
+    update((s) => (items: [...s.items, (id: id, text: text)]));
   }
 
-  void birthday() {
-    update((s) => (name: s.name, age: s.age + 1));
+  void clear() {
+    state = (items: const []);
   }
 }''';
 
-const _taskSource = '''class UserStore extends Store<UserState> {
-  UserStore() : super(state: (name: null, age: 0));
+const _taskSource = '''class NotesStore extends Store<NotesState> {
+  NotesStore() : super(state: (items: const []));
 
-  late final fetchUser = createTask<int, User, Exception>(
-    fn: (id) async {
-      final user = await api.getUser(id);
-      state = (name: user.name, age: user.age);
-      return user;
+  // Initial load from disk.
+  late final load = createVoidTask<void, Exception>(
+    fn: () async {
+      final loaded = await db.readAll();
+      state = (items: loaded);
     },
-    strategy: TaskStrategy.latest,
-  );
-
-  late final refresh = createVoidTask(
-    fn: () async => api.refreshCurrent(),
     strategy: TaskStrategy.once,
   );
+
+  // Auto-save after every add / remove, coalesced.
+  late final persist = createVoidTask(
+    fn: () async => await db.writeAll(state.items),
+    strategy: TaskStrategy.debounce(const Duration(milliseconds: 300)),
+  );
+
+  void add(String text) {
+    final id = 'n\${state.items.length}';
+    update((s) => (items: [...s.items, (id: id, text: text)]));
+    persist();
+  }
 }''';
 
-const _strategySource = '''late final save = createVoidTask(
-  fn: () async => await api.persist(state),
-  strategy: TaskStrategy.debounce(Duration(milliseconds: 500)),
+const _strategySource = '''late final persist = createVoidTask(
+  fn: () async => await db.writeAll(state.items),
+  strategy: TaskStrategy.debounce(Duration(milliseconds: 300)),
 );
 
-late final search = createTask<String, List<Hit>, Exception>(
-  fn: (query) => api.search(query),
+late final search = createTask<String, List<Note>, Exception>(
+  fn: (query) => searchEngine.find(query),
   strategy: TaskStrategy.latest,
 );''';

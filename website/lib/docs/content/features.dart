@@ -127,9 +127,10 @@ class FeaturesContent extends StatelessWidget {
         const CodeBlock(code: _lifecycleSource, language: 'dart'),
         const DocHeading('Putting it together'),
         const DocParagraph(
-          'A typical feature file is short. Here is a counter feature that '
-          'reads a flag from a toggle parent, adds a tab to a layout '
-          'parent, and exposes its store to everyone downstream:',
+          'A typical feature file is short. Here is the notes feature '
+          'extended with port wiring — it adds a tab to a layout parent, '
+          'plugs its UI into a keyed body slot, and exposes its store '
+          'to everyone downstream:',
         ),
         const CodeBlock(code: _togetherSource, language: 'dart'),
         const DocHeading('What is next?'),
@@ -160,48 +161,51 @@ const _signatureSource = '''Feature<TStores, TExports, TPorts> createFeature<
   ExportsFactory<TStores, TExports>? exports,
 })''';
 
-const _depsSource = '''final counterFeature = createFeature(
-  name: 'Counter',
-  dependsOn: [layoutFeature],
+const _depsSource = '''final searchFeature = createFeature(
+  name: 'Search',
+  // Hard parents — must be in the container.
+  dependsOn: [layoutFeature, notesFeature],
+  // Optional plugin host — handlers attached to its ports light up
+  // only when the toggles feature is present.
   optionalDependsOn: [featureTogglesFeature],
-  stores: (_) => (counter: CounterStore()),
+  stores: (_) => (search: SearchStore()),
   exports: (api) => api.own,
 );''';
 
-const _storesSource = '''final authFeature = createFeature(
-  name: 'Auth',
+const _storesSource = '''final notesFeature = createFeature(
+  name: 'Notes',
   stores: (_) => (
-    session: SessionStore(),
-    prefs: PrefsStore(),
+    notes: NotesStore(),
+    cache: PrivateCacheStore(),
   ),
-  // Hide PrefsStore from descendants — they only see session.
-  exports: (api) => (session: api.own.session),
+  // Hide PrivateCacheStore from descendants — they only see notes.
+  exports: (api) => (notes: api.own.notes),
 );''';
 
 const _portsSource = '''// layout/ports.dart
 final tabsPipe = createPipe<List<TabSpec>>(name: 'layout.tabs');
-final fabSlot = createMultiSlot<LayoutMode>(name: 'layout.fab');
+final bodyKeyedSlot = createKeyedSingleSlot<LayoutMode>(name: 'layout.body');
 
 // layout/config.dart
 final layoutFeature = createFeature(
   name: 'Layout',
-  ports: (tabsPipe: tabsPipe, fabSlot: fabSlot),
+  ports: (tabsPipe: tabsPipe, body: bodyKeyedSlot),
   stores: (_) => (activeTab: ActiveTabStore()),
   exports: (api) => api.own,
 );''';
 
-const _lifecycleSource = '''final adminFeature = createFeature(
-  name: 'Admin',
-  dependsOn: [authFeature],
-  stores: (_) => (panel: AdminPanelStore()),
+const _lifecycleSource = '''final searchFeature = createFeature(
+  name: 'Search',
+  dependsOn: [notesFeature],
+  stores: (_) => (search: SearchStore()),
   exports: (api) => api.own,
 )
   ..activation((parentApi, toggle, cleanup) {
-    // Gate on the session role — flip active/inactive as it changes.
+    // Gate search activation on whether there are notes to search.
     cleanup.subscribe(
-      parentApi.of(authFeature).session,
+      parentApi.of(notesFeature).notes,
       (_, current) => toggle(
-        current.role == Role.admin
+        current.items.isNotEmpty
             ? ToggleState.active
             : ToggleState.inactive,
       ),
@@ -209,21 +213,21 @@ const _lifecycleSource = '''final adminFeature = createFeature(
     );
   })
   ..onStart((api, cleanup) {
-    api.own.panel.loadInitialData();
+    api.own.search.rebuildIndex();
   });''';
 
-const _togetherSource = '''final counterFeature = createFeature(
-  name: 'Counter',
+const _togetherSource = '''final notesFeature = createFeature(
+  name: 'Notes',
   dependsOn: [layoutFeature],
   optionalDependsOn: [featureTogglesFeature],
-  stores: (_) => (counter: CounterStore()),
+  stores: (_) => (notes: NotesStore()),
   exports: (api) => api.own,
 )
   ..usePipe(layoutFeature.ports.tabsPipe, (tabs, _) => [
         ...tabs,
-        (id: 'counter', label: 'Counter', icon: Icons.add),
+        (id: 'notes', label: 'Notes', icon: Icons.note),
       ])
   ..useSingleSlot(
-    layoutFeature.ports.bodyKeyedSlot('counter'),
-    (mode, api) => CounterTab(store: api.own.counter, mode: mode),
+    layoutFeature.ports.body('notes'),
+    (mode, api) => NotesTab(store: api.own.notes, mode: mode),
   );''';

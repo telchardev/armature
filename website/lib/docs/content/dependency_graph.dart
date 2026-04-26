@@ -29,30 +29,31 @@ class DependencyGraphContent extends StatelessWidget {
           child: DagDiagram(
             nodes: [
               DagNode(id: 'layout', label: 'layoutFeature'),
-              DagNode(id: 'auth', label: 'authFeature'),
+              DagNode(id: 'toggles', label: 'featureTogglesFeature'),
               DagNode(
-                id: 'counter',
-                label: 'counterFeature',
+                id: 'notes',
+                label: 'notesFeature',
                 parentIds: ['layout'],
               ),
               DagNode(
-                id: 'history',
-                label: 'historyFeature',
-                parentIds: ['layout'],
+                id: 'search',
+                label: 'searchFeature',
+                parentIds: ['layout', 'notes'],
               ),
               DagNode(
-                id: 'admin',
-                label: 'adminFeature',
-                parentIds: ['layout', 'auth'],
+                id: 'analytics',
+                label: 'analyticsFeature',
+                parentIds: ['layout', 'toggles'],
               ),
             ],
           ),
         ),
         const DocParagraph(
-          'Activation flows downward. layoutFeature and authFeature are '
-          'roots, so they start in parallel. counterFeature, '
-          'historyFeature, and adminFeature wait for their parents — '
-          'adminFeature is last because it needs both.',
+          'Activation flows downward. layoutFeature and '
+          'featureTogglesFeature are roots, so they start in parallel. '
+          'notesFeature, searchFeature, and analyticsFeature wait for '
+          'their parents — searchFeature is last because it needs both '
+          'layout and notes.',
         ),
         const DocHeading('Declaring dependencies'),
         const DocParagraph(
@@ -182,13 +183,13 @@ class _DiagramFrame extends StatelessWidget {
   }
 }
 
-const _depsSource = '''final adminFeature = createFeature(
-  name: 'Admin',
+const _depsSource = '''final searchFeature = createFeature(
+  name: 'Search',
   // Required — Armature will error if any is missing.
-  dependsOn: [layoutFeature, authFeature],
-  // Soft — if featureTogglesFeature is absent, admin still activates
+  dependsOn: [layoutFeature, notesFeature],
+  // Soft — if featureTogglesFeature is absent, search still activates
   // and handlers registered on its ports are skipped.
   optionalDependsOn: [featureTogglesFeature],
-  stores: (_) => (panel: AdminPanelStore()),
+  stores: (_) => (search: SearchStore()),
   exports: (api) => api.own,
 );''';

@@ -1,4 +1,5 @@
-import 'package:armature/armature.dart' show AppContainer, Feature;
+import 'package:armature/armature.dart'
+    show AppContainer, ContainerStatus, Feature, FeatureStatus;
 import 'package:flutter/widgets.dart' show Widget;
 
 import '../contexts/container_context.dart' show ContainerContext;
@@ -15,9 +16,9 @@ typedef FlutterRendererErrorBuilder =
       required String errorMessage,
     });
 
-/// Widget-builder for the "slot is loading" state (feature is
-/// `.pending` or the container hasn't settled yet). Configured via
-/// [FlutterRendererOptions].
+/// Widget-builder for the "slot is loading" state (owning feature is
+/// [FeatureStatus.pending], or the container is still
+/// [ContainerStatus.starting]). Configured via [FlutterRendererOptions].
 typedef FlutterRendererLoaderBuilder = Widget Function();
 
 /// Optional per-app hooks for the default [FlutterRenderer] — lets the
@@ -29,8 +30,9 @@ class FlutterRendererOptions {
   /// the default fallback (`Text("Error in \"<feature\>\" feature: ...")`).
   final FlutterRendererErrorBuilder? errorBuilder;
 
-  /// Called whenever a slot is in the loading state (feature `.pending`,
-  /// or container still `.starting`). `null` renders nothing
+  /// Called whenever a slot is in the loading state (owning feature
+  /// [FeatureStatus.pending], or container still
+  /// [ContainerStatus.starting]). `null` renders nothing
   /// (`SizedBox.shrink()`).
   final FlutterRendererLoaderBuilder? loaderBuilder;
 

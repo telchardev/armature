@@ -54,9 +54,20 @@ class FeatureDebugInfo {
 
 /// Debug info for a single port registered by a feature.
 class PortDebugInfo {
+  /// Symbolic port identifier (matches the name passed to
+  /// `createPipe` / `createBehavior` / `createKeyedSingleSlot` / etc.).
   final String name;
+
+  /// Which port shape this is — pipe, behavior, single slot, or multi
+  /// slot.
   final PortType type;
+
+  /// How many handlers (across all features) are currently bound to
+  /// this port.
   final int handlerCount;
+
+  /// Names of features that contributed handlers to this port — useful
+  /// for tracing "who plugged into what".
   final List<String> handlerFeatureNames;
 
   PortDebugInfo({
@@ -70,7 +81,12 @@ class PortDebugInfo {
 /// A parent-of link from one feature to another with required/optional
 /// distinction.
 class FeatureDependency {
+  /// Name of the parent feature this dependency points to.
   final String featureName;
+
+  /// Whether this is a hard dependency (declared via `dependsOn` —
+  /// parent activation is required) or a soft one (`optionalDependsOn`
+  /// — child activates regardless).
   final bool isRequired;
 
   FeatureDependency({required this.featureName, required this.isRequired});

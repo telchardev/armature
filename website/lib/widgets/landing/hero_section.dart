@@ -103,7 +103,7 @@ class _HeroText extends StatelessWidget {
           runSpacing: 12,
           children: [
             FilledButton.icon(
-              onPressed: () => context.go('/docs/getting-started'),
+              onPressed: () => context.go('/docs/quickstart'),
               icon: const Icon(Icons.rocket_launch_outlined),
               label: const Text('Get started'),
               style: FilledButton.styleFrom(

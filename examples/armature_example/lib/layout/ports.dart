@@ -14,7 +14,7 @@ final bodyKeyedSlot = createKeyedSingleSlot<LayoutMode>(name: 'layout.body');
 
 final actionsSlot = createMultiSlot<LayoutMode>(name: 'layout.actions');
 
-final fabSlot = createMultiSlot<LayoutMode>(name: 'layout.fab');
+final fabSlot = createMultiSlot(name: 'layout.fab');
 
 final themeBehavior = createBehavior<ThemeMode, ThemeData>(
   name: 'layout.theme',

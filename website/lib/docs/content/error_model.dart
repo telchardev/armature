@@ -139,6 +139,10 @@ class ErrorModelContent extends StatelessWidget {
           'createFeatureRoot — the mounting point whose build is the '
           'source of most RenderErrors.',
         ),
+        const DocBullet(
+          'Slot widgets — the providers whose handler throws become '
+          'RenderError reports.',
+        ),
       ],
     );
   }

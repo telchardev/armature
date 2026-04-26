@@ -1,4 +1,5 @@
-import 'package:armature/armature.dart' show AppContainer, Feature;
+import 'package:armature/armature.dart'
+    show AppContainer, ContainerStatus, Feature, FeatureStatus;
 import 'package:flutter/widgets.dart' show Widget;
 
 import '../ports/slot_descriptor.dart' show SlotDescriptor;
@@ -23,9 +24,10 @@ abstract class Renderer {
     required String errorMessage,
   });
 
-  /// Widget rendered while a slot is in the loading state (feature
-  /// `.pending`, or container still `.starting`). `null` means "render
-  /// nothing / empty space".
+  /// Widget rendered while a slot is in the loading state (owning
+  /// feature [FeatureStatus.pending], or container still
+  /// [ContainerStatus.starting]). `null` means "render nothing / empty
+  /// space".
   Widget? renderLoader();
 
   /// Builds the root provider stack that should wrap every feature

@@ -10,11 +10,11 @@ needs cycle detection + topologically-ordered lifecycle hooks.
 
 - **`Graph<T>`** — a DAG of nodes where each node has a `T` payload
   with its own declared `parents` / `optionalParents`.
-- **`GraphNodeStatus`** — `.disabled` / `.pending` / `.active`.
+- **`GraphNodeStatus`** — `disabled` / `pending` / `active`.
 - **`GraphVisitor<T>`** — user-supplied hooks:
   - `shouldBeActive(node)` — the node's own preference.
   - `onActivate(node)` / `onDeactivate(node)` — called when the node
-    enters / leaves `.active`.
+    enters / leaves `GraphNodeStatus.active`.
   - `onStatusChanged(node, status)` — fires for every settled
     transition.
   - `onError(node, error, st)` — receives caught visitor throws.

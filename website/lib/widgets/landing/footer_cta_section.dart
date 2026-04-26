@@ -42,7 +42,7 @@ class FooterCtaSection extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 FilledButton.icon(
-                  onPressed: () => context.go('/docs/getting-started'),
+                  onPressed: () => context.go('/docs/quickstart'),
                   icon: const Icon(Icons.menu_book_outlined),
                   label: const Text('Read docs'),
                   style: FilledButton.styleFrom(

@@ -13,7 +13,24 @@ abstract class LoggerDebugInfo {
 /// Severity levels for log messages, ordered from least to most severe.
 /// Loggers compare by [LogLevel.index] to implement minimum-level
 /// filtering.
-enum LogLevel { debug, info, warning, error }
+enum LogLevel {
+  /// Verbose tracing useful while debugging — typically silenced in
+  /// production builds.
+  debug,
+
+  /// Informational events about expected lifecycle progress
+  /// (container start, feature activation, etc.).
+  info,
+
+  /// Recoverable anomalies that may indicate a misconfiguration but did
+  /// not stop the framework from continuing.
+  warning,
+
+  /// Failures the framework reports for visibility — note that
+  /// user-actionable errors flow through `ContainerOptions.errorHandler`,
+  /// not through this level.
+  error,
+}
 
 /// Interface for logging framework events.
 ///

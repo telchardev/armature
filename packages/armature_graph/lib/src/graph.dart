@@ -265,6 +265,12 @@ class Graph<TNodeValue extends GraphNodeValue> {
 
   /// Returns node values in topological order — parents before children.
   /// The returned view is unmodifiable and cached across calls.
+  ///
+  /// Useful for any consumer that needs to walk the graph respecting
+  /// dependency order (e.g. building a debug snapshot, dumping the
+  /// graph, or implementing parent-first traversal in a custom
+  /// visitor). Cheap to call repeatedly — the result is computed once
+  /// per [Graph] instance.
   List<TNodeValue> topologicalOrder() {
     return _topoCache ??= UnmodifiableListView(_computeTopologicalOrder());
   }
@@ -272,7 +278,11 @@ class Graph<TNodeValue extends GraphNodeValue> {
   /// Returns [root] plus all transitively dependent nodes (children,
   /// grandchildren, …), in topological order. Unmodifiable view.
   ///
-  /// Memoized in [_descendantsCache]: graph topology is immutable after
+  /// Mainly used internally by [recompute] to drive a per-root cascade,
+  /// but exposed for consumers that want the same "everyone affected
+  /// when this node toggles" view.
+  ///
+  /// Memoized in `_descendantsCache`: graph topology is immutable after
   /// construction, so the BFS + topo-filter for each root runs at most
   /// once, which matters for frequent [recompute] callers.
   List<TNodeValue> descendantsInTopologicalOrder(TNodeValue root) {

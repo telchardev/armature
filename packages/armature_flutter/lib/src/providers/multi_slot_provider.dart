@@ -16,16 +16,12 @@ typedef MultiSlotWidgetBuilder =
 /// Reactively subscribes to a [MultiSlot] and rebuilds when the set of
 /// children or their tracked atoms change. The builder receives the
 /// sorted widget list (empty when no handler contributes).
-class MultiSlotProvider<
-  TInputData,
-  TSlot extends MultiSlot<TInputData, MultiSlotHandler<TInputData>>
->
-    extends StatefulWidget {
+class MultiSlotProvider<TInputData> extends StatefulWidget {
   final MultiSlotWidgetBuilder builder;
 
   final TInputData data;
 
-  final TSlot slot;
+  final MultiSlot<TInputData, MultiSlotHandler<TInputData>> slot;
 
   const MultiSlotProvider({
     super.key,
@@ -35,19 +31,16 @@ class MultiSlotProvider<
   });
 
   @override
-  State<MultiSlotProvider<TInputData, TSlot>> createState() =>
-      _MultiSlotProviderState<TInputData, TSlot>();
+  State<MultiSlotProvider<TInputData>> createState() =>
+      _MultiSlotProviderState<TInputData>();
 }
 
-class _MultiSlotProviderState<
-  TInputData,
-  TSlot extends MultiSlot<TInputData, MultiSlotHandler<TInputData>>
->
+class _MultiSlotProviderState<TInputData>
     extends
         PortProviderState<
           List<Widget>,
           TInputData,
-          MultiSlotProvider<TInputData, TSlot>
+          MultiSlotProvider<TInputData>
         > {
   @override
   List<Widget> get fallbackValue => const [];
@@ -67,7 +60,7 @@ class _MultiSlotProviderState<
   }
 
   @override
-  void didUpdateWidget(MultiSlotProvider<TInputData, TSlot> oldWidget) {
+  void didUpdateWidget(MultiSlotProvider<TInputData> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.slot != oldWidget.slot) {

@@ -54,38 +54,63 @@ sealed class TaskStrategy {
       TaskStrategyThrottle;
 }
 
-/// See [TaskStrategy.once].
+/// Cache-and-share strategy: the function runs once; later calls share
+/// the cached result (or in-flight future). See [TaskStrategy.once].
 final class TaskStrategyOnce extends TaskStrategy {
   const TaskStrategyOnce();
 }
 
-/// See [TaskStrategy.queue].
+/// FIFO serialise strategy: each call awaits the previous one to settle
+/// before its own work begins. See [TaskStrategy.queue].
 final class TaskStrategyQueue extends TaskStrategy {
   const TaskStrategyQueue();
 }
 
-/// See [TaskStrategy.latest].
+/// Supersede-and-share strategy: a new call cancels the in-flight one;
+/// all pending callers share the latest run's outcome. See
+/// [TaskStrategy.latest].
 final class TaskStrategyLatest extends TaskStrategy {
   const TaskStrategyLatest();
 }
 
+/// Coalesce-burst strategy: each call restarts a quiet timer; the
+/// function fires once after [duration] passes with no further calls.
 /// See [TaskStrategy.debounce].
 final class TaskStrategyDebounce extends TaskStrategy {
+  /// Quiet window the timer waits for after the most recent call before
+  /// the function actually fires.
   final Duration duration;
 
   const TaskStrategyDebounce(this.duration);
 }
 
+/// Rate-limit strategy: at most one run per [duration] window. The
+/// [edge] selects which call within the window actually drives the run.
 /// See [TaskStrategy.throttle].
 final class TaskStrategyThrottle extends TaskStrategy {
+  /// Cooldown window between consecutive runs.
   final Duration duration;
+
+  /// Which call inside each window fires the function — [ThrottleEdge.leading]
+  /// (the first one, immediately) or [ThrottleEdge.trailing] (the last one,
+  /// at the end of the window).
   final ThrottleEdge edge;
 
   const TaskStrategyThrottle(this.duration, {this.edge = ThrottleEdge.leading});
 }
 
 /// Edge semantics for [TaskStrategy.throttle].
-enum ThrottleEdge { leading, trailing }
+enum ThrottleEdge {
+  /// The first call in each window runs immediately; subsequent calls
+  /// during the cooldown return the in-flight (or most recently
+  /// settled) future.
+  leading,
+
+  /// The function runs once at the end of each window with the most
+  /// recent parameters; calls within the window coalesce into the
+  /// scheduled run.
+  trailing,
+}
 
 /// Atomic snapshot of a [Task]'s lifecycle. Replaces the previous trio
 /// of independent `pending` / `done` / `fail` states — observers now
