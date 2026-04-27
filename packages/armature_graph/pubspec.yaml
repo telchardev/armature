@@ -2,7 +2,7 @@ name: armature_graph
 description: >-
   Directed-acyclic-graph resolver with topological ordering and visitor-based
   activation cascade. Pure Dart.
-version: 0.1.0
+version: 1.0.0
 homepage: https://github.com/telchardev/armature
 repository: https://github.com/telchardev/armature
 issue_tracker: https://github.com/telchardev/armature/issues

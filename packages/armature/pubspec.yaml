@@ -2,7 +2,7 @@ name: armature
 description: >-
   Feature-based app framework with dependency-graph resolution, reactive stores,
   typed ports (pipes / behaviors / slots), and tasks.
-version: 0.3.1
+version: 0.4.0
 homepage: https://telchardev.github.io/armature
 repository: https://github.com/telchardev/armature
 issue_tracker: https://github.com/telchardev/armature/issues
@@ -22,8 +22,8 @@ resolution: workspace
 dependencies:
   meta: ^1.17.0
   test: ^1.30.0
-  armature_graph: ^0.1.0
-  armature_reactive: ^0.1.0
+  armature_graph: ^1.0.0
+  armature_reactive: ^1.0.0
 
 dev_dependencies:
   lints: ^6.0.0

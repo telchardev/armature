@@ -13,8 +13,8 @@ Large applications quickly devolve into a web of providers and singletons. `arma
 
 ```yaml
 dependencies:
-  armature: ^0.3.1
-  armature_flutter: ^0.3.1   # if you want the Flutter integration
+  armature: ^0.4.0
+  armature_flutter: ^0.4.0   # if you want the Flutter integration
 ```
 
 ## Quickstart

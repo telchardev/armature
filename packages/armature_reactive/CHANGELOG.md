@@ -1,3 +1,10 @@
+## 1.0.0
+
+> First stable release. Public API is unchanged since 0.1.0 — `Atom`,
+> `Reaction`, `Context`, batching, and the `ReactiveError` hierarchy
+> have shipped through several `armature` release cycles without
+> change, and the package is now committed to semver.
+
 ## 0.1.0
 
 - Initial release — reactive primitives for `armature`:

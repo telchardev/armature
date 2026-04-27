@@ -2,7 +2,7 @@ name: armature_reactive
 description: >-
   Lightweight MobX-style reactive primitives — Atom, Reaction, and automatic
   dependency tracking for pure Dart.
-version: 0.1.0
+version: 1.0.0
 homepage: https://github.com/telchardev/armature
 repository: https://github.com/telchardev/armature
 issue_tracker: https://github.com/telchardev/armature/issues

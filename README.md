@@ -104,12 +104,12 @@ Two features, one dependency edge, one port — that's the smallest example that
 ```mermaid
 flowchart TB
     reactive["<b>armature_reactive</b><br/>Atom · Reaction · Context"]
-    graph["<b>armature_graph</b><br/>Graph · Node · DAG resolution"]
+    dag["<b>armature_graph</b><br/>Graph · Node · DAG resolution"]
     core["<b>armature</b><br/>AppContainer · Feature · Store · Task · Ports"]
     flutter["<b>armature_flutter</b><br/>ArmatureApp · slot widgets · StoreBuilder · StoreSelector · FeatureGraphOverlay"]
 
     reactive --> core
-    graph --> core
+    dag --> core
     core --> flutter
 ```
 
@@ -134,10 +134,10 @@ flowchart TB
 
 | Package | Version | Dart SDK | pub.dev |
 |---------|---------|----------|---------|
-| `armature` | 0.3.1 | `^3.9.0` | [→](https://pub.dev/packages/armature) |
-| `armature_flutter` | 0.3.1 | `^3.9.0` | [→](https://pub.dev/packages/armature_flutter) |
-| `armature_reactive` | 0.1.0 | `^3.9.0` | [→](https://pub.dev/packages/armature_reactive) |
-| `armature_graph` | 0.1.0 | `^3.9.0` | [→](https://pub.dev/packages/armature_graph) |
+| `armature` | 0.4.0   | `^3.9.0` | [→](https://pub.dev/packages/armature) |
+| `armature_flutter` | 0.4.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_flutter) |
+| `armature_reactive` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_reactive) |
+| `armature_graph` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_graph) |
 
 ## License
 

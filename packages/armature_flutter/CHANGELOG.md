@@ -1,3 +1,43 @@
+## 0.4.0
+
+> Tracks the `armature` 0.4.0 container lifecycle rename. No new
+> Flutter-side surface — but consumers that called `dispose()` on a
+> container directly must migrate.
+
+### Changed
+
+- `ArmatureApp` now calls `container.stop()` instead of
+  `container.dispose()` when the widget is disposed. With the new
+  restart-friendly cycle, the container can be `start()`-ed again from
+  user code if the same `ArmatureApp` is remounted.
+- `container_dispose_test.dart` removed; the equivalent restart-cycle
+  coverage now lives in `armature`'s `container_test.dart`.
+
+### Migration
+
+- Any user code that called `container.dispose()` directly (for example,
+  when bootstrapping a container outside `ArmatureApp`) must switch to
+  `container.stop()`. See the `armature` 0.4.0 changelog for the full
+  rationale.
+
+### Documentation
+
+- `SlotDescriptor`, `SlotLoaderBuilder`, and `Renderer.renderLoader`
+  doc-comments now reference `FeatureStatus.pending` /
+  `FeatureStatus.active` / `ContainerStatus.starting` explicitly instead
+  of the `.pending` / `.active` shorthand.
+- Provider and renderer files (`single_slot_provider.dart`,
+  `multi_slot_provider.dart`, `flutter_renderer.dart`) cleaned up the
+  same way.
+- README aligned with the current API surface.
+
+### Depends on
+
+- `armature: ^0.4.0` — see that package's CHANGELOG for the lifecycle
+  rename details.
+- `armature_reactive: ^1.0.0` (was `^0.1.0`) — first stable release;
+  public API unchanged.
+
 ## 0.3.1
 
 > Docs and example refresh. No library code changes.

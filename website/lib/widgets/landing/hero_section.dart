@@ -5,18 +5,28 @@ import '../code_block.dart';
 import '../external_links.dart';
 import '../max_width.dart';
 
-const _sampleCode = '''final counterFeature = createFeature(
-  name: 'Counter',
+const _sampleCode = '''final notesFeature = createFeature(
+  name: 'Notes',
   dependsOn: [layoutFeature],
-  stores: (_) => (counter: CounterStore()),
+  stores: (_) => (notes: NotesStore()),
   exports: (api) => api.own,
 )
-  ..usePipe(layoutFeature.ports.tabsPipe, (tabs, _) => [
+  ..usePipe(layoutFeature.ports.tabs, (tabs, _) => [
         ...tabs,
-        (id: 'counter', label: 'Counter', icon: Icons.add),
+        (id: 'notes', label: 'Notes', icon: Icons.note),
       ])
-  ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('counter'),
-      (mode, api) => CounterTab(store: api.own.counter));''';
+  ..useSingleSlot(layoutFeature.ports.body('notes'),
+      (_, api) => NotesTab(store: api.own.notes));
+
+// Search auto-activates only when notes is non-empty.
+final searchFeature = createFeature(
+  name: 'Search',
+  dependsOn: [notesFeature],
+)..activation(whenStoreState(
+  feature: notesFeature,
+  store: (e) => e.notes,
+  predicate: (s) => s.items.isNotEmpty,
+));''';
 
 class HeroSection extends StatelessWidget {
   const HeroSection({super.key});
