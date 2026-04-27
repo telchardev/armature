@@ -12,28 +12,19 @@ final todoFeature = createFeature(
   exports: (api) => api.own,
 );
 
-final _todoRoot = createFeatureRoot(
+final todoRoot = createFeatureRoot(
   feature: todoFeature,
-  widget: const _TodoView(),
+  widget: const TodoView(),
 );
 
-class TodoDemoWidget extends StatelessWidget {
-  const TodoDemoWidget({super.key});
+class TodoView extends StatefulWidget {
+  const TodoView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ArmatureApp(features: [todoFeature], child: _todoRoot(data: null));
-  }
+  State<TodoView> createState() => _TodoViewState();
 }
 
-class _TodoView extends StatefulWidget {
-  const _TodoView();
-
-  @override
-  State<_TodoView> createState() => _TodoViewState();
-}
-
-class _TodoViewState extends State<_TodoView> {
+class _TodoViewState extends State<TodoView> {
   // TextEditingController is UI-only — not a Store — so the widget
   // owns it and disposes it. Framework only manages Stores.
   late final TextEditingController _input;
@@ -108,7 +99,7 @@ class _TodoViewState extends State<_TodoView> {
               return Column(
                 children: [
                   for (final todo in items)
-                    _TodoTile(
+                    TodoTile(
                       todo: todo,
                       onToggle: () => store.toggle(todo.id),
                       onRemove: () => store.remove(todo.id),
@@ -146,8 +137,9 @@ class _TodoViewState extends State<_TodoView> {
   }
 }
 
-class _TodoTile extends StatelessWidget {
-  const _TodoTile({
+class TodoTile extends StatelessWidget {
+  const TodoTile({
+    super.key,
     required this.todo,
     required this.onToggle,
     required this.onRemove,
@@ -185,4 +177,13 @@ class _TodoTile extends StatelessWidget {
       ),
     );
   }
+}
+
+void main() {
+  runApp(
+    ArmatureApp(
+      features: [todoFeature],
+      child: MaterialApp(home: todoRoot(data: null)),
+    ),
+  );
 }

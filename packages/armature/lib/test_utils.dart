@@ -74,7 +74,7 @@ ErrorCollector collectErrors({int? maxResolveConcurrency}) {
 /// Replaces the common three-liner:
 /// ```dart
 /// final container = AppContainer(features: [...]);
-/// addTearDown(container.dispose);
+/// addTearDown(container.stop);
 /// await container.start();
 /// ```
 Future<AppContainer> startedContainer({
@@ -87,7 +87,7 @@ Future<AppContainer> startedContainer({
     options: options ?? silentOptions(),
     logger: logger,
   );
-  addTearDown(container.dispose);
+  addTearDown(container.stop);
   await container.start();
   return container;
 }

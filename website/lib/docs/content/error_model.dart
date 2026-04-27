@@ -95,11 +95,11 @@ class ErrorModelContent extends StatelessWidget {
           'ignored:',
         ),
         const DocBullet(
-          'ContainerError — wrong container state (start() on disposed, '
-          'apply() before start(), etc.).',
+          'ContainerError — wrong container state (apply() before '
+          'start(), double start() without an intervening stop(), etc.).',
         ),
         const DocBullet(
-          'ContainerUsageError — caller misuse (dispose() from inside a '
+          'ContainerUsageError — caller misuse (stop() from inside a '
           'feature callback, reaching into orchestrator internals).',
         ),
         const DocBullet(

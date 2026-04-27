@@ -38,7 +38,8 @@ import './port_subscription.dart' show PortSubscription;
 /// Lifecycle status of a [AppContainer].
 enum ContainerStatus {
   /// Constructed but `start()` has not been called yet — features are
-  /// declared, no resolution or activation has happened.
+  /// declared, no resolution or activation has happened. Also the
+  /// resting state after [AppContainer.stop] returns.
   idle,
 
   /// `start()` is in progress: the dependency graph is being built and
@@ -48,22 +49,18 @@ enum ContainerStatus {
   /// `start()` finished successfully; features can be toggled, ports
   /// invoked, and tasks dispatched.
   working,
-
-  /// `dispose()` has been called; the container is permanently torn
-  /// down and most APIs throw [ContainerUsageError].
-  disposed,
 }
 
 /// Error handler callback for recoverable feature errors.
 ///
 /// [source] is the attribution label — the feature name for feature-
 /// scoped errors, or one of the sentinels `'<container>'` (container-
-/// lifecycle throws such as `onDispose`) / `'<events>'` (throws from
-/// listeners on port-level events where no feature subscribed directly).
-/// The domain feature name (when known) is also carried on the
-/// [ArmatureError] subtype via its own `featureName` field; use that
-/// when the caller specifically wants "the feature this error is about"
-/// rather than "what triggered this callback".
+/// lifecycle throws) / `'<events>'` (throws from listeners on port-
+/// level events where no feature subscribed directly). The domain
+/// feature name (when known) is also carried on the [ArmatureError]
+/// subtype via its own `featureName` field; use that when the caller
+/// specifically wants "the feature this error is about" rather than
+/// "what triggered this callback".
 typedef ContainerErrorHandler =
     void Function({
       required String source,
@@ -93,8 +90,6 @@ class ContainerOptions {
   ///   `.disabled`; required descendants cascade closed)
   /// * Store `dispose()` throws during teardown → [HandlerError]
   /// * Lifetime cleanup disposer throws → [HandlerError]
-  /// * `onDispose` container-callback throws → [HandlerError]
-  ///   (feature name `'<container>'`)
   /// * Listener throws from [AppContainer.onFeatureStatusChanged] /
   ///   [AppContainer.onPortChanged] → [ListenerError]
   /// * Apply-time [PortError] (wrong owner) → [PortError] (slot falls
@@ -138,25 +133,25 @@ class ContainerOptions {
 /// ```dart
 /// final container = AppContainer(features: [layoutFeature, authFeature]);
 /// await container.start();
+/// // ...
+/// await container.stop(); // tears down; can call start() again later
 /// ```
 final class AppContainer {
   /// Debug-only finalizer that warns when an [AppContainer] is
-  /// garbage-collected without ever being disposed. Catches forgotten
-  /// `dispose()` calls in tests and hot-reload scenarios where
-  /// lingering timers / stream subscriptions / port handler entries
-  /// would otherwise leak silently.
+  /// garbage-collected while still active (i.e. without a matching
+  /// [stop]). Catches forgotten `stop()` calls in tests and hot-reload
+  /// scenarios where lingering timers / stream subscriptions / port
+  /// handler entries would otherwise leak silently.
   ///
-  /// Attached in debug builds only (via `assert`), so production
-  /// behaviour is unchanged. Routes through `dart:developer`'s `log`
-  /// so the message shows up in DevTools' log stream rather than as a
-  /// raw `print` — `log` is more appropriate for framework-level
-  /// diagnostics than `print` and doesn't need an `avoid_print` lint
-  /// suppression.
+  /// Attached on each [start] (debug builds only, via `assert`),
+  /// detached when [stop] completes — so a container that was
+  /// constructed but never started raises no warning, and a container
+  /// that was cleanly stopped raises no warning either.
   static final Finalizer<String> _debugFinalizer = Finalizer((name) {
     log(
-      '$name was garbage-collected without dispose(). This may '
+      '$name was garbage-collected while still active. This may '
       'indicate leaked timers, stream subscriptions, or stale port '
-      'handlers. Call `container.dispose()` when done.',
+      'handlers. Call `container.stop()` when done.',
       name: 'armature.AppContainer',
       level: 900, // WARNING per dart:developer convention.
     );
@@ -175,15 +170,16 @@ final class AppContainer {
 
   /// Per-container feature runtime state. Populated at construction —
   /// one fresh [FeatureRuntime] per declared feature per container —
-  /// and dropped wholesale on [dispose]. Two containers that share the
+  /// and reused across start/stop cycles (the runtime resets its own
+  /// per-cycle state in `teardown`). Two containers that share the
   /// same top-level `final` feature instance hold independent entries
-  /// here, so async dispose of one cannot corrupt the other's state.
+  /// here, so async teardown of one cannot corrupt the other's state.
   final Map<AnyFeature, FeatureRuntime> _runtimes = {};
 
   /// Per-container port handler registry. Keyed by `port` → `feature`
   /// → wrapped handler (erased to [Function]; concrete types are
   /// reconstituted inside each [Port] subclass via a per-entry cast).
-  /// Cleared on dispose — no cross-container handler leakage.
+  /// Cleared on every [stop] — no cross-cycle handler leakage.
   final Map<AnyPort, Map<AnyFeature, Function>> _portHandlers = {};
 
   final Map<String, Duration> _resolveTimes = {};
@@ -199,9 +195,14 @@ final class AppContainer {
 
   ContainerStatus _status = ContainerStatus.idle;
 
-  /// In-flight `start()` future, tracked so `dispose()` can await it
-  /// before tearing down. `null` outside of a `start()` call.
+  /// In-flight `start()` future, tracked so [stop] can await it before
+  /// tearing down. `null` outside of a `start()` call.
   Future<void>? _startFuture;
+
+  /// In-flight `stop()` future, tracked so concurrent `stop()` calls
+  /// coalesce and so the orchestrator can detect "stop requested" via
+  /// [isStopping]. `null` outside of a `stop()` call.
+  Future<void>? _stopping;
 
   ContainerStatus get status {
     return _status;
@@ -222,67 +223,57 @@ final class AppContainer {
     for (final f in _features) {
       _runtimes[f] = FeatureRuntime(feature: f, container: this);
     }
-    assert(() {
-      _debugFinalizer.attach(
-        this,
-        'AppContainer#${identityHashCode(this)}',
-        detach: this,
-      );
-      return true;
-    }());
-  }
-
-  /// Guard: fail if the container has already been disposed. Used by
-  /// every public operation that must not run after teardown.
-  void _checkNotDisposed() {
-    if (_status == ContainerStatus.disposed) {
-      throw ContainerError('AppContainer is disposed.');
-    }
   }
 
   /// Guard: fail unless the container is in the fully-started
   /// `.working` state. [op] is a short description of the attempted
   /// operation used in the error message (e.g. `'toggle a feature'`).
   void _requireWorking(String op) {
-    _checkNotDisposed();
     if (_status != ContainerStatus.working) {
       throw ContainerError('AppContainer must be started to $op.');
     }
   }
 
-  /// Disposes the container, awaiting per-feature cleanup (which may be
-  /// async if any disposer returns a `Future`), then tears down event
-  /// buses and reaction tracking.
+  /// Stops the container: deactivates every feature (LIFO), runs
+  /// per-feature lifetime cleanup, disposes the per-cycle stores and
+  /// status stores, clears port handlers, and drops every registered
+  /// event listener. The container then returns to
+  /// [ContainerStatus.idle] and [start] can be called again to spin up
+  /// a fresh cycle (with new store instances).
   ///
-  /// Idempotent: subsequent calls return the same in-flight future.
-  Future<void> dispose() {
-    return _disposing ??= _runDispose();
+  /// **No-op when already `.idle`.** Concurrent calls coalesce into the
+  /// same in-flight future.
+  ///
+  /// **Cannot be called from a feature lifecycle callback** (`setup`,
+  /// `onStart`, port handlers) — throws [ContainerUsageError]. Schedule
+  /// the stop outside the callback if you need to.
+  ///
+  /// **References to stores / exports / handler context obtained from
+  /// the previous cycle are stale after stop.** The underlying objects
+  /// were disposed; re-fetch through `use(...)` / `useStore(...)` after
+  /// the next [start]. Widget consumers using `WatchPort` /
+  /// `useFeature` re-resolve through the container on rebuild.
+  ///
+  /// **Event listeners registered via [onFeatureStatusChanged] /
+  /// [onPortChanged] are dropped.** Re-subscribe after the next [start]
+  /// if you want to keep observing.
+  ///
+  /// Per-cycle resources (a websocket, a database handle, a telemetry
+  /// session) belong inside a feature's `setup` / `onStart` and its
+  /// `cleanup` bag — not at the container level. The cleanup bag
+  /// drains automatically on stop, then a fresh one is allocated for
+  /// the next cycle.
+  Future<void> stop() {
+    return _stopping ??= _runStop();
   }
 
-  Future<void>? _disposing;
-
-  final List<void Function()> _disposeCallbacks = [];
-
-  /// Registers [callback] to run at the tail of [dispose] (after feature
-  /// teardown and internal cleanup). Use to release resources owned
-  /// externally that reference the container — e.g. the
-  /// `armature_flutter` renderer global.
-  ///
-  /// Callbacks are invoked once, in registration order. Throws are
-  /// swallowed and logged so one misbehaving callback doesn't block the
-  /// others.
-  @internal
-  void onDispose(void Function() callback) {
-    _disposeCallbacks.add(callback);
-  }
-
-  Future<void> _runDispose() async {
-    // Forbid dispose invoked from within a feature lifecycle callback
+  Future<void> _runStop() async {
+    // Forbid stop invoked from within a feature lifecycle callback
     // (setup / onStart). Awaiting `_startFuture` from inside such a
     // callback would self-deadlock; throwing gives a clearer signal
     // for the bug. Detected via a zone marker installed by
     // [runAsUserCallback] around user-supplied callbacks — this does
-    // NOT fire for `dispose()` called from outside `start()` while a
+    // NOT fire for `stop()` called from outside `start()` while a
     // start is merely in flight in the background.
     //
     // Yield one microtask first so that the synchronous reject flows
@@ -291,102 +282,88 @@ final class AppContainer {
     // returned Future after the caller's frame has unwound).
     await null;
     if (Zone.current[userCallbackZoneKey] == true) {
-      // Clear the cached future so a later, legitimate dispose() call
+      // Clear the cached future so a later, legitimate stop() call
       // from outside the user callback can run instead of replaying
       // this rejection.
-      _disposing = null;
+      _stopping = null;
       throw ContainerUsageError(
-        'AppContainer.dispose() cannot be called from within a feature '
-        'lifecycle callback. Schedule the dispose outside of it '
-        '(e.g. unawaited(Future.microtask(container.dispose))).',
+        'AppContainer.stop() cannot be called from within a feature '
+        'lifecycle callback. Schedule the stop outside of it '
+        '(e.g. unawaited(Future.microtask(container.stop))).',
       );
     }
 
-    // Claim the `.disposed` status immediately — external observers
-    // (SlotWidget, listener callbacks) should see the transition as
-    // soon as dispose is initiated, even if the actual teardown has
-    // to wait for an in-flight start to settle below.
-    _status = ContainerStatus.disposed;
-
-    // Detach the debug finalizer — from here on, GC-without-dispose is
-    // no longer a concern.
-    assert(() {
-      _debugFinalizer.detach(this);
-      return true;
-    }());
+    // Already idle — nothing to tear down. Clear the cached future so
+    // a subsequent stop() after a new start() runs fresh.
+    if (_status == ContainerStatus.idle) {
+      _stopping = null;
+      return;
+    }
 
     // Wait for any in-flight start() to settle before tearing down.
     // Otherwise teardown races with feature resolution and leaves
     // handler registrations + partially-initialised stores behind.
-    final pendingStart = _startFuture;
-    if (pendingStart != null) {
-      try {
-        await pendingStart;
-      } on Object {
-        // start() failed; `_rollback()` already ran. We still proceed
-        // with teardown below.
+    // The orchestrator's start phases observe `isStopping` (true while
+    // `_stopping` is non-null) and short-circuit — so the wait is
+    // bounded by however long the current phase takes to drain.
+    //
+    // Only wait when status is `.starting` — that's when the start is
+    // actively running orchestrator phases. A start that's still
+    // queued waiting for *us* (mutual await via `_runStart`'s
+    // `await _stopping` step) hasn't transitioned status yet; awaiting
+    // it here would deadlock because each side waits for the other.
+    if (_status == ContainerStatus.starting) {
+      final pendingStart = _startFuture;
+      if (pendingStart != null) {
+        try {
+          await pendingStart;
+        } on Object {
+          // start() failed; `_rollback()` already ran. We still proceed
+          // with teardown below in case rollback produced no effect
+          // (e.g. graph never built).
+        }
       }
     }
 
-    await _teardownFeatures(forRestart: false);
+    await _teardownFeatures();
+    _events.clearListeners();
 
-    for (final cb in _disposeCallbacks) {
-      try {
-        cb();
-      } on Object catch (e, st) {
-        _reportContainerError(
-          error: e,
-          stackTrace: st,
-          operation: 'onDispose callback',
-          meta: const {'event': 'onDispose'},
-        );
-      }
-    }
-    _disposeCallbacks.clear();
+    _status = ContainerStatus.idle;
+    _stopping = null;
+
+    assert(() {
+      _debugFinalizer.detach(this);
+      return true;
+    }());
   }
 
-  /// Shared teardown path used by both [_runDispose] and [_rollback].
+  /// Whether a [stop] is in progress. Internal signal for the
+  /// orchestrator and emit gates so they can short-circuit work that
+  /// would otherwise race with teardown.
+  @internal
+  bool get isStopping => _stopping != null;
+
+  /// Shared teardown path used by both [_runStop] and [_rollback].
   ///
   /// Tears down every feature via the lifecycle layer (which handles
   /// graph shutdown — including draining its activation-concurrency
-  /// semaphore — and per-feature store cleanup), clears reaction
-  /// tracking, and clears resolve-time stats. Feature internal state is
+  /// semaphore — and per-feature store cleanup), clears the port
+  /// handler map and resolve-time stats. Feature internal state is
   /// always restored to the freshly-constructed baseline inside
-  /// [FeatureInternal.teardown] so the same top-level instance can be
-  /// reused in a future container.
-  ///
-  /// When [forRestart] is `true` (polished-rollback):
-  ///   * The orchestrator drops its graph so a subsequent [start]
-  ///     builds everything fresh.
-  ///   * Port handlers registered statically at feature-construction
-  ///     time (via `usePipe`, `useBehavior`, …) are **kept** — a retry
-  ///     needs them in place, since the class-level cascade isn't
-  ///     re-invoked.
-  ///   * Events stay alive (no `dispose()`), since the container is
-  ///     still usable.
-  ///
-  /// When [forRestart] is `false` (full dispose):
-  ///   * Port handlers are deregistered so top-level ports shared
-  ///     across container instances don't accumulate stale entries.
-  ///     The next container's construct phase re-registers them from
-  ///     each feature's recorded bindings.
-  ///   * Events are disposed.
-  Future<void> _teardownFeatures({required bool forRestart}) async {
+  /// [FeatureRuntime.teardown] so the same runtime can be reused in
+  /// the next start cycle on this same container.
+  Future<void> _teardownFeatures() async {
     await _orchestrator.teardown();
 
     // Drop every handler contributed to any port this container
     // installed. Since `_portHandlers` is container-scoped, other
     // containers sharing the same top-level ports are unaffected.
-    // On rollback we also clear — the next start() retry re-installs
-    // handlers from each feature's recorded `portBindings` via the
-    // orchestrator's install-port-handlers step.
+    // The next start() re-installs handlers from each feature's
+    // recorded `portBindings` via the orchestrator's install-port-
+    // handlers step.
     _portHandlers.clear();
 
     _resolveTimes.clear();
-
-    if (!forRestart) {
-      _events.dispose();
-    }
   }
 
   /// Applies a [port] within the scope of [rootFeature] as a one-shot,
@@ -403,7 +380,6 @@ final class AppContainer {
     required TValue initialValue,
     required TInputData data,
   }) {
-    _checkNotDisposed();
     if (_status == ContainerStatus.idle) {
       throw ContainerError(
         'AppContainer is not started. Call start() before apply().',
@@ -453,7 +429,6 @@ final class AppContainer {
     required TInputData data,
     required void Function() onChanged,
   }) {
-    _checkNotDisposed();
     if (_status == ContainerStatus.idle) {
       throw ContainerError(
         'AppContainer is not started. Call start() before observe().',
@@ -488,9 +463,6 @@ final class AppContainer {
   @internal
   ContainerOptions? get options => _options;
 
-  @internal
-  bool get isDisposed => _status == ContainerStatus.disposed;
-
   /// Fires `portChanged` for [port]. Called by the orchestrator's
   /// post-activation / post-deactivation hooks when a feature owning a
   /// handler on the port transitions active ↔ disabled — the handler
@@ -504,13 +476,13 @@ final class AppContainer {
   /// mutations.
   @internal
   void emitPortChanged(AnyPort port) {
-    // Silently skip events after dispose: teardown runs onDeactivate
-    // for every feature, which would otherwise notify subscribers who
-    // then re-enter `apply()` / `statusOf()` on the already-disposed
-    // container. Subscribers don't need per-feature deactivation
-    // events during container dispose — the whole container is going
-    // away.
-    if (_status == ContainerStatus.disposed) return;
+    // Silently skip events while a stop is in progress: teardown runs
+    // onDeactivate for every feature, which would otherwise notify
+    // subscribers who then re-enter `apply()` / `statusOf()` on a
+    // container that's tearing down. Subscribers don't need per-
+    // feature deactivation events during stop — the whole container
+    // is going idle.
+    if (isStopping) return;
     _events.portChanged.emit(port);
   }
 
@@ -521,7 +493,7 @@ final class AppContainer {
   /// event per activation cycle.
   @internal
   void emitFeatureStatusChanged(AnyFeature feature) {
-    if (_status == ContainerStatus.disposed) return;
+    if (isStopping) return;
     _events.featureStatusChanged.emit(feature);
   }
 
@@ -554,37 +526,6 @@ final class AppContainer {
       meta: meta,
     );
   }
-
-  /// Routes a container-scoped recoverable error (one without feature
-  /// attribution — e.g. `onDispose` callback throws) through the
-  /// configured [ContainerErrorHandler] using [_containerSentinel] as
-  /// the attribution source. [operation] labels the failing operation
-  /// for diagnostics (e.g. `'onDispose callback'`) and is threaded into
-  /// the wrapped [HandlerError]. [meta] carries the originating event
-  /// so handlers can filter.
-  void _reportContainerError({
-    required Object error,
-    required Map<String, String> meta,
-    StackTrace? stackTrace,
-    String? operation,
-  }) {
-    _callErrorHandler(
-      source: _containerSentinel,
-      error: HandlerError.wrap(
-        _containerSentinel,
-        error,
-        source: operation,
-        stackTrace: stackTrace,
-      ),
-      meta: meta,
-    );
-  }
-
-  /// Synthetic `source` passed to [ContainerErrorHandler] for errors
-  /// that originate above the feature layer (e.g. `onDispose`
-  /// container-callback throws). Compare with [Events.eventsSentinel],
-  /// used for listener errors on container-scoped events.
-  static const _containerSentinel = '<container>';
 
   void _callErrorHandler({
     required String source,
@@ -697,31 +638,90 @@ final class AppContainer {
   ///
   /// Idempotent: setting the current state is a no-op and resolves with
   /// a completed future. Throws [ContainerError] if the container is not
-  /// `.working` (i.e. before [start] has succeeded or after [dispose]).
+  /// `.working` (i.e. before [start] has succeeded or while a [stop] is
+  /// in progress).
   Future<void> toggleFeature(Feature feature, ToggleState state) {
     _requireWorking('toggle a feature');
     return _orchestrator.toggleFeature(feature, state);
   }
 
   /// Resolves all features in dependency order and starts the container.
+  ///
+  /// Idempotent and queue-friendly with [stop]:
+  /// * Calling [start] while a [start] is already in flight returns the
+  ///   same future (concurrent calls coalesce).
+  /// * Calling [start] when the container is already in
+  ///   [ContainerStatus.working] (and no stop is pending) is a no-op.
+  /// * Calling [start] while a [stop] is in flight queues the start —
+  ///   it begins after the stop completes, on the next cycle's fresh
+  ///   stores.
+  ///
+  /// Throws [ContainerUsageError] if invoked from within a feature
+  /// lifecycle callback (would self-deadlock).
   Future<void> start() {
-    if (_status == ContainerStatus.disposed) {
-      throw ContainerError('AppContainer is disposed.');
+    // Re-entrance guard runs first — before coalesce — because the
+    // in-flight start IS the caller (a feature callback re-entering
+    // start()). Coalescing onto the in-flight future would have the
+    // callback await its own parent and deadlock.
+    if (Zone.current[userCallbackZoneKey] == true) {
+      return Future.error(
+        ContainerUsageError(
+          'AppContainer.start() cannot be called from within a feature '
+          'lifecycle callback. Schedule the start outside of it '
+          '(e.g. unawaited(Future.microtask(container.start))).',
+        ),
+      );
     }
-    if (_status == ContainerStatus.working) {
-      throw ContainerError('AppContainer is already started.');
+
+    // Coalesce: an in-flight (or queued-after-stop) start returns the
+    // same future. Two consecutive `container.start()` calls share one
+    // result — the second doesn't kick off a second cycle.
+    final inFlight = _startFuture;
+    if (inFlight != null) return inFlight;
+
+    // No-op: container is already up and no stop is tearing it down.
+    // Returns an already-completed future so callers can `await` without
+    // ceremony.
+    if (_status == ContainerStatus.working && _stopping == null) {
+      return Future.value();
     }
-    if (_status == ContainerStatus.starting) {
-      throw ContainerError('AppContainer is starting.');
-    }
+
+    assert(() {
+      // Re-attach the debug finalizer for this cycle. `detach` first
+      // is defensive — if a previous cycle didn't detach (e.g. because
+      // it was never stopped), we'd otherwise stack attach calls.
+      _debugFinalizer.detach(this);
+      _debugFinalizer.attach(
+        this,
+        'AppContainer#${identityHashCode(this)}',
+        detach: this,
+      );
+      return true;
+    }());
     return _startFuture = _runStart();
   }
 
   Future<void> _runStart() async {
+    // Mutual await: if a stop is in flight, queue after it. The stop
+    // returns the container to `.idle`; this start then runs fresh on
+    // the next cycle's stores. Stop's failures don't block us — we
+    // proceed regardless and surface our own outcome.
+    final pendingStop = _stopping;
+    if (pendingStop != null) {
+      try {
+        await pendingStop;
+      } on Object {
+        // Swallowed — this start's outcome stands on its own.
+      }
+    }
+
     _status = ContainerStatus.starting;
     try {
       await _orchestrator.start();
-      if (_status != ContainerStatus.disposed) {
+      // Don't flip to .working if a stop has been requested mid-start
+      // — `_runStop` is awaiting our completion and will set `.idle`
+      // after teardown.
+      if (!isStopping) {
         _status = ContainerStatus.working;
       }
       // Graph-level misconfiguration surfaces as the sealed [GraphError]
@@ -764,14 +764,20 @@ final class AppContainer {
   /// side-effect it produced so the container is in a clean `.idle`
   /// state indistinguishable from a freshly-constructed one. A
   /// subsequent `start()` can then run without replaying stale
-  /// handlers or partially-initialised stores.
+  /// handlers or partially-initialised stores. Unlike [stop], rollback
+  /// also drops registered event listeners so observers don't witness
+  /// partial states from the failed attempt on the next try.
   Future<void> _rollback() async {
-    await _teardownFeatures(forRestart: true);
-    if (_status != ContainerStatus.disposed) _status = ContainerStatus.idle;
+    await _teardownFeatures();
+    _events.clearListeners();
+    _status = ContainerStatus.idle;
   }
 
   /// Subscribes to feature status-change events (any transition among
   /// `disabled` / `pending` / `active`). Returns a disposer.
+  ///
+  /// Listeners are dropped on [stop]; re-subscribe after the next
+  /// [start] if you want to keep observing.
   void Function() onFeatureStatusChanged({
     required Feature feature,
     required void Function() callback,
@@ -794,6 +800,9 @@ final class AppContainer {
   /// privately, without fanning out to every [onPortChanged]
   /// listener (which would wake unrelated subscribers and regress
   /// per-subscriber isolation).
+  ///
+  /// Listeners are dropped on [stop]; re-subscribe after the next
+  /// [start] if you want to keep observing.
   void Function() onPortChanged({
     required AnyPort port,
     required void Function() callback,

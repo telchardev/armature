@@ -10,7 +10,7 @@ void main() {
   group('ContainerContext', () {
     testWidgets('provides container to descendants', (tester) async {
       final container = AppContainer(features: []);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       AppContainer? foundContainer;
 

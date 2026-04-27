@@ -184,7 +184,7 @@ void main() {
       expect(container.statusOf(dependent), equals(FeatureStatus.disabled));
     });
 
-    test('status store is disposed on container.dispose', () async {
+    test('status store is disposed on container.stop', () async {
       final parent = createFeature(name: 'parent');
       final child = createFeature(name: 'child', dependsOn: [parent]);
 
@@ -195,12 +195,12 @@ void main() {
       await container.start();
 
       final store = container.runtimeOf(child).parent.statusOf(parent);
-      // Before dispose: reads + subscribes ok.
+      // Before stop: reads + subscribes ok.
       expect(store.state, equals(FeatureStatus.active));
 
-      await container.dispose();
+      await container.stop();
 
-      // After dispose: further subscribe must not throw on the disposed
+      // After stop: further subscribe must not throw on the disposed
       // store's underlying state — it's idempotently disposed.
       // The store object still exists but is inert.
     });

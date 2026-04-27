@@ -14,7 +14,7 @@ void main() {
           ..usePipe(pipe, (v, _) => v + 2);
 
         final container = AppContainer(features: [owner, child1, child2]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final handlers = container.handlersOf(pipe);
@@ -86,7 +86,7 @@ void main() {
           ..usePipe(pipe, (v, _) => v + 10);
 
         final container = AppContainer(features: [owner, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final result = container.apply(
@@ -108,7 +108,7 @@ void main() {
         ..usePipe(pipe, (v, _) => v + 1);
 
       final container = AppContainer(features: [owner, child]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final result = container.apply(
@@ -145,7 +145,7 @@ void main() {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final r1 = container.apply(
@@ -187,7 +187,7 @@ void main() {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final result = container.apply(

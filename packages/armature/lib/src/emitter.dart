@@ -94,7 +94,7 @@ class Emitter<TEvent> {
 
   /// Drops every registered listener. Idempotent. Subsequent [emit]
   /// calls are no-ops.
-  void dispose() {
+  void clear() {
     _listeners.clear();
   }
 }

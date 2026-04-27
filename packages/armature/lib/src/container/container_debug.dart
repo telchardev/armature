@@ -5,7 +5,7 @@ import '../feature/feature.dart' show AnyFeature;
 import '../feature/feature_status.dart' show FeatureStatus;
 import '../port/port_type.dart' show PortType;
 import '../store/store.dart' show Store;
-import './container.dart' show AppContainer, ContainerStatus;
+import './container.dart' show AppContainer;
 
 /// Structured, read-only snapshot of an [AppContainer] for debug tooling.
 ///
@@ -95,17 +95,12 @@ class FeatureDependency {
 /// Builds a fresh [ContainerDebug] snapshot. Re-invoke to refresh — nothing
 /// is cached; each call walks the live graph.
 ///
-/// Throws [ContainerUsageError] if the container is disposed (the graph
-/// is still referenced after teardown but the snapshot would describe a
-/// torn-down state), or if the graph has not yet been built — i.e.
-/// before the first successful `start()` or after a rolled-back start.
+/// Throws [ContainerUsageError] if the dependency graph has not been
+/// built — i.e. before the first successful `start()`, after a rolled-
+/// back start, or after [AppContainer.stop] (the graph is dropped on
+/// every teardown).
 extension ContainerDebugExt on AppContainer {
   ContainerDebug get debug {
-    if (status == ContainerStatus.disposed) {
-      throw ContainerUsageError(
-        'AppContainer.debug is unavailable after dispose().',
-      );
-    }
     final g = graph;
     final nodeByValue = <AnyFeature, GraphNode<AnyFeature>>{};
     for (final root in g.rootNodes) {

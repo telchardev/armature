@@ -39,7 +39,7 @@ typedef AnyFeature = Feature<dynamic, dynamic, dynamic>;
 /// calls `toggle(state: ...)` with the desired [ToggleState].
 ///
 /// Register teardown for any subscriptions via `cleanup.add(disposer)`.
-/// The bag is sealed on `AppContainer.dispose` and all disposers run in LIFO
+/// The bag is sealed on `AppContainer.stop` and all disposers run in LIFO
 /// order.
 typedef ActivationSetup =
     FutureOr<void> Function(
@@ -284,7 +284,7 @@ final class Feature<
   /// Must be called **before** any [AppContainer] that uses this
   /// feature reaches its construct phase. Once any container has
   /// constructed this feature (even one that has since been
-  /// disposed), further [useStores] calls throw
+  /// stopped), further [useStores] calls throw
   /// [FeatureResolutionError] — a late override would silently apply
   /// only to future containers, which is almost always a bug.
   void useStores(StoresFactory<TStores> factory) {

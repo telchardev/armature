@@ -1,7 +1,8 @@
+import 'package:armature_flutter/armature_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../docs/doc_typography.dart';
-import '../../../widgets/code_block.dart';
+import '../../../widgets/loaded_code_block.dart';
 import 'todo_widget.dart';
 
 class TodoExamplePage extends StatelessWidget {
@@ -75,9 +76,18 @@ class _PreviewTabState extends State<_PreviewTab>
     return const Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 24),
-        child: TodoDemoWidget(),
+        child: _TodoDemoEmbed(),
       ),
     );
+  }
+}
+
+class _TodoDemoEmbed extends StatelessWidget {
+  const _TodoDemoEmbed();
+
+  @override
+  Widget build(BuildContext context) {
+    return ArmatureApp(features: [todoFeature], child: todoRoot(data: null));
   }
 }
 
@@ -92,10 +102,14 @@ class _CodeTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: const [
           _Caption('todo_store.dart'),
-          CodeBlock(code: _todoStoreSource, language: 'dart'),
+          LoadedCodeBlock(
+            path: 'lib/examples/content/todo_list/todo_store.dart',
+          ),
           SizedBox(height: 20),
           _Caption('todo_widget.dart'),
-          CodeBlock(code: _todoWidgetSource, language: 'dart'),
+          LoadedCodeBlock(
+            path: 'lib/examples/content/todo_list/todo_widget.dart',
+          ),
         ],
       ),
     );
@@ -120,204 +134,3 @@ class _Caption extends StatelessWidget {
     );
   }
 }
-
-const _todoStoreSource = r'''import 'package:armature/armature.dart';
-
-typedef Todo = ({String id, String text, bool done});
-
-typedef TodoState = ({List<Todo> items});
-
-/// A small reactive store for a todo list example.
-///
-/// State is a record with one field — an immutable list of todos.
-/// Actions are plain methods; each one writes a **new** list so the
-/// equality filter sees a change and observers re-render.
-class TodoStore extends Store<TodoState> {
-  TodoStore() : super(state: (items: <Todo>[]));
-
-  void add(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-    final todo = (
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      text: trimmed,
-      done: false,
-    );
-    state = (items: [...state.items, todo]);
-  }
-
-  void toggle(String id) {
-    state = (
-      items: [
-        for (final t in state.items)
-          if (t.id == id) (id: t.id, text: t.text, done: !t.done) else t,
-      ],
-    );
-  }
-
-  void remove(String id) {
-    state = (items: state.items.where((t) => t.id != id).toList());
-  }
-
-  void clearDone() {
-    state = (items: state.items.where((t) => !t.done).toList());
-  }
-}
-''';
-
-const _todoWidgetSource = r'''import 'package:armature/armature.dart';
-import 'package:armature_flutter/armature_flutter.dart';
-import 'package:flutter/material.dart';
-
-import 'todo_store.dart';
-
-/// Feature owning the [TodoStore] — container disposes it automatically.
-final todoFeature = createFeature(
-  name: 'Todo',
-  stores: (_) => (todos: TodoStore()),
-  exports: (api) => api.own,
-);
-
-final _todoRoot = createFeatureRoot(
-  feature: todoFeature,
-  widget: const _TodoView(),
-);
-
-class TodoDemoWidget extends StatelessWidget {
-  const TodoDemoWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ArmatureApp(
-      features: [todoFeature],
-      child: _todoRoot(data: null),
-    );
-  }
-}
-
-class _TodoView extends StatefulWidget {
-  const _TodoView();
-
-  @override
-  State<_TodoView> createState() => _TodoViewState();
-}
-
-class _TodoViewState extends State<_TodoView> {
-  // TextEditingController is UI-only — not a Store — so the widget
-  // owns it and disposes it. Framework only manages Stores.
-  late final TextEditingController _input;
-
-  @override
-  void initState() {
-    super.initState();
-    _input = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _input.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final store = StoreContext.of<TodoStore>(context);
-
-    void submit() {
-      store.add(_input.text);
-      _input.clear();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _input,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => submit(),
-                decoration: const InputDecoration(hintText: 'Add a todo…'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(onPressed: submit, child: const Text('Add')),
-          ],
-        ),
-        const SizedBox(height: 16),
-        StateObserver(
-          builder: (_) {
-            final items = store.state.items;
-            if (items.isEmpty) {
-              return const Text('Nothing yet — add your first todo above.');
-            }
-            return Column(
-              children: [
-                for (final todo in items)
-                  _TodoTile(
-                    todo: todo,
-                    onToggle: () => store.toggle(todo.id),
-                    onRemove: () => store.remove(todo.id),
-                  ),
-              ],
-            );
-          },
-        ),
-        StateObserver(
-          builder: (_) {
-            final items = store.state.items;
-            final remaining = items.where((t) => !t.done).length;
-            final hasDone = items.any((t) => t.done);
-            return Row(
-              children: [
-                Text('$remaining remaining'),
-                const Spacer(),
-                TextButton(
-                  onPressed: hasDone ? store.clearDone : null,
-                  child: const Text('Clear done'),
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _TodoTile extends StatelessWidget {
-  const _TodoTile({
-    required this.todo,
-    required this.onToggle,
-    required this.onRemove,
-  });
-
-  final Todo todo;
-  final VoidCallback onToggle;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Checkbox(value: todo.done, onChanged: (_) => onToggle()),
-        Expanded(
-          child: Text(
-            todo.text,
-            style: TextStyle(
-              decoration: todo.done ? TextDecoration.lineThrough : null,
-            ),
-          ),
-        ),
-        IconButton(
-          onPressed: onRemove,
-          icon: const Icon(Icons.close, size: 18),
-        ),
-      ],
-    );
-  }
-}
-''';

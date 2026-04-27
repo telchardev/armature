@@ -25,8 +25,8 @@ const examplesTree = <ExampleSection>[
   ExampleSection(
     title: 'Composition',
     entries: [
+      ExampleEntry(slug: 'notes-app', title: 'Notes app'),
       ExampleEntry(slug: 'feature-toggles', title: 'Feature toggles'),
-      ExampleEntry(slug: 'auth-flow', title: 'Auth flow'),
     ],
   ),
 ];

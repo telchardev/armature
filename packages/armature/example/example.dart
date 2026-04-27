@@ -153,5 +153,5 @@ Future<void> main() async {
   await _orders.placeOrder('o-4');
   print('after 4 orders: analytics=${_analytics.state}');
 
-  await container.dispose();
+  await container.stop();
 }

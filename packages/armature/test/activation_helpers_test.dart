@@ -83,7 +83,7 @@ void main() {
     });
 
     test(
-      'subscription is disposed on container.dispose (no stale toggles)',
+      'subscription is disposed on container.stop (no stale toggles)',
       () async {
         final parent = createFeature(
           name: 'parent',
@@ -106,16 +106,16 @@ void main() {
         await container.start();
 
         final toggleStore = parent.storeOf<_ToggleStore>(container);
-        // Dispose — should run cleanup bag, unsubscribing from toggleStore.
-        await container.dispose();
+        // Stop — should run cleanup bag, unsubscribing from toggleStore.
+        await container.stop();
 
-        // Mutate after dispose — must NOT throw or leak. If the
+        // Mutate after stop — must NOT throw or leak. If the
         // subscription is live, any subsequent toggle would hit a
-        // disposed container and explode; a sealed container silently
+        // stopped container and explode; a sealed container silently
         // ignores.
         toggleStore.set(true);
         // No assertion besides "didn't throw" — a leaked subscription
-        // would go via `toggle` into a disposed container.
+        // would go via `toggle` into a stopped container.
       },
     );
   });

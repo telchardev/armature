@@ -31,7 +31,7 @@ Future<void> main() async {
 
         // child depends on parent, but parent is not added
         final container = AppContainer(features: [child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         expect(container.status, equals(ContainerStatus.idle));
 
@@ -48,7 +48,7 @@ Future<void> main() async {
         final child = createFeature(name: "child", dependsOn: [parent]);
 
         final container = AppContainer(features: [child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         // First attempt fails.
         await expectLater(
@@ -73,7 +73,7 @@ Future<void> main() async {
             ),
           ],
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await expectLater(
           container.start,
@@ -100,7 +100,7 @@ Future<void> main() async {
         );
 
         final container = AppContainer(features: [setupFeature, orphan]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await expectLater(
           container.start,
@@ -130,7 +130,7 @@ Future<void> main() async {
           features: [healthy, orphan],
           options: silentOptions(),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await expectLater(
           container.start,
@@ -173,7 +173,7 @@ Future<void> main() async {
             features: [healthy, bad],
             options: silentOptions(),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           await expectLater(
             container.start,
@@ -206,7 +206,7 @@ Future<void> main() async {
             features: [feature],
             options: silentOptions(),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           // First start fails fail-fast; polished rollback clears the
           // cached `_scopeApi`, so a subsequent `useStores` override
@@ -232,7 +232,7 @@ Future<void> main() async {
           ..activation((_, _, _) => throw Exception('setup failed'));
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isFalse);
@@ -254,7 +254,7 @@ Future<void> main() async {
             features: [feature],
             options: silentOptions(),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           await expectLater(
             container.start,
@@ -275,7 +275,7 @@ Future<void> main() async {
           ..onStart((_, _) => throw Exception('onStart failed'));
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.status, equals(ContainerStatus.working));
@@ -296,7 +296,7 @@ Future<void> main() async {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(parent), equals(FeatureStatus.disabled));
@@ -321,7 +321,7 @@ Future<void> main() async {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final names = captured.map((e) => e.source).toSet();
@@ -343,7 +343,7 @@ Future<void> main() async {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await container.start();
 

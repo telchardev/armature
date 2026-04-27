@@ -26,7 +26,7 @@ ActivationSetup manualActivation() {
 /// `toggle(.active)` whenever [predicate] evaluates to `true` for the
 /// store's current state, `.inactive` otherwise. The subscription
 /// disposer is registered on the activation's `cleanup` bag — it
-/// unsubscribes automatically on container dispose.
+/// unsubscribes automatically on container stop.
 ///
 /// ```dart
 /// inspectorFeature

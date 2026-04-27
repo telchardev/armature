@@ -43,8 +43,8 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
 
   final List<AnyFeature> _features;
 
-  /// Populated on first successful [start] and cleared by the
-  /// polished-rollback teardown path (`forRestart: true`).
+  /// Populated on every [start] (built by [_buildGraph]) and cleared
+  /// by [teardown] so the next cycle starts from an empty graph.
   Graph<AnyFeature>? _graph;
 
   Graph<AnyFeature> get graph {
@@ -94,11 +94,11 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
     // config cascade. Must happen before construct because stores
     // factories may observe port values indirectly via scopeApi.
     _installPortHandlers(g);
-    if (host.isDisposed) return;
+    if (host.isStopping) return;
 
     // Phase 2: eager construct. First factory throw aborts start.
     _runConstructPhase(g);
-    if (host.isDisposed) return;
+    if (host.isStopping) return;
 
     // Phase 3: user setups. Batched toggles, no cascade.
     _inSetupPhase = true;
@@ -107,7 +107,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
     } finally {
       _inSetupPhase = false;
     }
-    if (host.isDisposed) return;
+    if (host.isStopping) return;
 
     // Phase 4: one cascade (tail-awaits any nested recomputes).
     await g.resolve();
@@ -119,7 +119,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   /// one — we always install a fresh handler set on each `start()`.
   void _installPortHandlers(Graph<AnyFeature> g) {
     for (final f in g.topologicalOrder()) {
-      if (host.isDisposed) return;
+      if (host.isStopping) return;
       for (final binding in f.config.portBindings) {
         host.addPortHandler(
           port: binding.port,
@@ -134,7 +134,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   /// per-container runtime.
   void _runConstructPhase(Graph<AnyFeature> g) {
     for (final f in g.topologicalOrder()) {
-      if (host.isDisposed) return;
+      if (host.isStopping) return;
       host.runtimeOf(f).construct();
     }
   }
@@ -201,7 +201,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   /// on every status transition (`.pending`, `.active`, `.disabled`).
   @override
   void onStatusChanged(AnyFeature feature, GraphNodeStatus newStatus) {
-    if (host.isDisposed) return;
+    if (host.isStopping) return;
     // Always mirror graph-committed status into the reactive store so
     // observers (StateObserver, MultiPortBuilder, whenActive) see every
     // transition — including the transient `.pending` for loader UI.
@@ -258,7 +258,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
       _onToggle(feature, state);
 
   Future<void> _onToggle(AnyFeature feature, ToggleState state) {
-    if (host.isDisposed) return Future.value();
+    if (host.isStopping) return Future.value();
     final runtime = host.runtimeOf(feature);
     final active = state == ToggleState.active;
     if (runtime.ownActive == active) return Future.value();
@@ -270,7 +270,7 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   Future<void> _runActivationSetups(Graph<AnyFeature> g) async {
     final pending = <Future<void>>[];
     for (final f in g.topologicalOrder()) {
-      if (host.isDisposed) return;
+      if (host.isStopping) return;
       final config = f.config;
       final setup = config.activationSetup;
       if (setup == null) continue;

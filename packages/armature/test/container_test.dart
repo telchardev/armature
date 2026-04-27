@@ -1,5 +1,5 @@
 // Core AppContainer lifecycle: dependency resolution, start /
-// dispose, reentrance, and port apply. Rollback + error recovery
+// stop, reentrance, and port apply. Rollback + error recovery
 // + listener errors live in their own files.
 
 import 'dart:async';
@@ -8,6 +8,10 @@ import 'package:armature/armature.dart';
 import 'package:test/test.dart';
 
 import '_helpers.dart';
+
+class _Counter extends Store<int> {
+  _Counter() : super(state: 0);
+}
 
 Future<void> main() async {
   group('AppContainer', () {
@@ -23,7 +27,7 @@ Future<void> main() async {
           );
 
           var container = AppContainer(features: [secondFeature]);
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           await expectLater(container.start, throwsA(isA<ArmatureError>()));
         },
@@ -111,7 +115,7 @@ Future<void> main() async {
             feature15,
           ],
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await container.start();
 
@@ -127,18 +131,18 @@ Future<void> main() async {
           });
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isFalse);
       });
     });
 
-    group('start / dispose lifecycle', () {
+    group('start / stop lifecycle', () {
       test('transitions to .working after successful start', () async {
         final feature = createFeature(name: "root");
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         expect(container.status, equals(ContainerStatus.idle));
 
@@ -147,62 +151,80 @@ Future<void> main() async {
         expect(container.status, equals(ContainerStatus.working));
       });
 
-      test('should throw when called twice on working container', () async {
+      test('start() while already .working is a no-op', () async {
         final container = AppContainer(features: [createFeature(name: "f")]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
-        await expectLater(container.start, throwsA(isA<ContainerError>()));
+        // Second start on a working container completes immediately,
+        // doesn't run a fresh cycle.
+        await container.start();
+        expect(container.status, equals(ContainerStatus.working));
       });
 
-      test('should throw when called concurrently', () async {
-        final feature = createFeature(name: "slow")
-          ..activation((_, toggle, _) async {
-            await Future<void>.delayed(const Duration(milliseconds: 100));
-            unawaited(toggle(ToggleState.active));
-          });
+      test(
+        'concurrent start() calls coalesce on the in-flight future',
+        () async {
+          final feature = createFeature(name: "slow")
+            ..activation((_, toggle, _) async {
+              await Future<void>.delayed(const Duration(milliseconds: 60));
+              unawaited(toggle(ToggleState.active));
+            });
 
-        final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
-        final firstStart = container.start();
+          final container = AppContainer(features: [feature]);
+          addTearDown(container.stop);
 
-        await expectLater(container.start, throwsA(isA<ContainerError>()));
+          final f1 = container.start();
+          final f2 = container.start();
+          expect(
+            identical(f1, f2),
+            isTrue,
+            reason: 'two concurrent start() calls share one future',
+          );
 
-        await firstStart;
-      });
+          await f1;
+          expect(container.status, equals(ContainerStatus.working));
+        },
+      );
 
-      test('start() after dispose throws ContainerError', () async {
+      test('start() after stop succeeds (container is reusable)', () async {
         final feature = createFeature(name: "f");
         final container = AppContainer(features: [feature]);
         await container.start();
-        await container.dispose();
+        await container.stop();
+        expect(container.status, equals(ContainerStatus.idle));
 
-        await expectLater(container.start, throwsA(isA<ContainerError>()));
+        // Stop returns the container to .idle; the next start() rebuilds
+        // a fresh cycle without throwing.
+        await container.start();
+        expect(container.status, equals(ContainerStatus.working));
+
+        await container.stop();
       });
 
-      test('dispose() is idempotent', () async {
+      test('stop() is idempotent', () async {
         final feature = createFeature(name: "f");
         final container = AppContainer(features: [feature]);
         await container.start();
 
-        await container.dispose();
-        await container.dispose();
-        expect(container.status, equals(ContainerStatus.disposed));
+        await container.stop();
+        await container.stop();
+        expect(container.status, equals(ContainerStatus.idle));
       });
 
-      test('dispose() clears features and resolveTimes', () async {
+      test('stop() clears resolveTimes', () async {
         final feature = createFeature(name: "f");
         final container = AppContainer(features: [feature]);
         await container.start();
 
         expect(container.resolveTimes, isNotEmpty);
 
-        await container.dispose();
+        await container.stop();
 
         expect(container.resolveTimes, isEmpty);
       });
 
-      test('dispose during throttled resolve does not hang', () async {
+      test('stop during throttled resolve does not hang', () async {
         final features = <AnyFeature>[
           for (var i = 0; i < 10; i++)
             createFeature(name: "f$i")..activation((_, toggle, _) async {
@@ -218,14 +240,19 @@ Future<void> main() async {
 
         final startFuture = container.start();
         await Future<void>.delayed(const Duration(milliseconds: 10));
-        unawaited(container.dispose());
+        final stopFuture = container.stop();
 
-        // start() must complete in reasonable time — not hang forever.
-        await startFuture.timeout(const Duration(seconds: 2));
-        expect(container.status, equals(ContainerStatus.disposed));
+        // Both start() and stop() must complete in reasonable time —
+        // stop awaits the in-flight start before tearing down, so a
+        // hung start would also hang stop.
+        await Future.wait([
+          startFuture,
+          stopFuture,
+        ]).timeout(const Duration(seconds: 2));
+        expect(container.status, equals(ContainerStatus.idle));
       });
 
-      test('dispose clears the container port handler map', () async {
+      test('stop clears the container port handler map', () async {
         final shared = createPipe<int>(name: "shared");
         final holder = createFeature(name: "holder")
           ..usePipe(shared, (v, _) => v + 1);
@@ -233,31 +260,225 @@ Future<void> main() async {
         await container.start();
         expect(container.handlersOf(shared).length, equals(1));
 
-        await container.dispose();
+        await container.stop();
 
-        // Per-container map is wiped on dispose — another container built
-        // from the same top-level `shared` + `holder` pair allocates its
-        // own fresh handler map.
+        // Per-container map is wiped on stop — the next start() (or
+        // another container built from the same top-level `shared` +
+        // `holder` pair) re-installs a fresh handler set.
         expect(
           container.handlersOf(shared),
           isEmpty,
           reason:
-              'dispose clears the container-scoped handler map; '
+              'stop clears the container-scoped handler map; '
               'handlers on other containers are unaffected',
         );
       });
     });
 
+    // Restart-friendly contract: the parts that are unique to reusing
+    // the *same* container across start/stop cycles. Cross-container
+    // reuse (one container.stop() → fresh container with the same
+    // features) lives in container_reuse_test.dart.
+    group('restart cycle', () {
+      test('next start() builds fresh stores (identity changes)', () async {
+        final feature = createFeature(
+          name: "fresh-stores",
+          stores: (_) => (counter: _Counter()),
+          exports: (api) => api.own,
+        );
+
+        final container = AppContainer(features: [feature]);
+        addTearDown(container.stop);
+
+        await container.start();
+        final firstStores = container.runtimeOf(feature).scopeApi.stores;
+
+        await container.stop();
+        await container.start();
+
+        final secondStores = container.runtimeOf(feature).scopeApi.stores;
+        expect(
+          identical(firstStores, secondStores),
+          isFalse,
+          reason: 'each start() cycle constructs a fresh stores record',
+        );
+      });
+
+      test('statusStore identity is fresh on the second cycle', () async {
+        final feature = createFeature(name: "status-fresh");
+        final container = AppContainer(features: [feature]);
+        addTearDown(container.stop);
+
+        await container.start();
+        final firstStatus = container.runtimeOf(feature).statusStore;
+
+        await container.stop();
+        await container.start();
+
+        final secondStatus = container.runtimeOf(feature).statusStore;
+        expect(
+          identical(firstStatus, secondStatus),
+          isFalse,
+          reason:
+              'statusStore is recreated in teardown so the next cycle '
+              'lands writes on an undisposed instance',
+        );
+      });
+
+      test('lifetimeCleanup re-arms across cycles', () async {
+        var firstCycleCleanup = 0;
+        var secondCycleCleanup = 0;
+        var cycleIndex = 0;
+        final feature = createFeature(name: "lifetime-rearm")
+          ..activation((_, _, cleanup) {
+            final witness = cycleIndex;
+            cleanup.add(() {
+              if (witness == 0) {
+                firstCycleCleanup++;
+              } else {
+                secondCycleCleanup++;
+              }
+            });
+          });
+
+        final container = AppContainer(features: [feature]);
+        addTearDown(container.stop);
+
+        await container.start();
+        await container.stop();
+        expect(firstCycleCleanup, equals(1));
+        expect(secondCycleCleanup, equals(0));
+
+        cycleIndex = 1;
+        await container.start();
+        await container.stop();
+        expect(firstCycleCleanup, equals(1));
+        expect(
+          secondCycleCleanup,
+          equals(1),
+          reason:
+              'second cycle gets its own lifetimeCleanup bag, the disposer '
+              'registered in the second activation runs only on the second stop',
+        );
+      });
+
+      test('event listeners are cleared after stop', () async {
+        final root = createFeature(name: "root");
+        final container = AppContainer(features: [root]);
+        addTearDown(container.stop);
+
+        await container.start();
+
+        var notifications = 0;
+        container.onFeatureStatusChanged(
+          feature: root,
+          callback: () => notifications++,
+        );
+
+        await container.stop();
+        // Subscriber is gone — re-running the cycle must not wake the
+        // previously-registered listener. Cycle 2 brings the feature
+        // back to .active during start, which would normally emit one
+        // featureStatusChanged.
+        await container.start();
+
+        expect(
+          notifications,
+          equals(0),
+          reason: 'listeners registered before stop() must not fire after stop',
+        );
+      });
+
+      test(
+        'start() during in-flight stop queues — runs after stop completes',
+        () async {
+          final slow = createFeature(name: "slow")
+            ..activation((_, _, cleanup) {
+              // Async cleanup so stop() spends real time tearing down,
+              // giving start() a window to land while it's still in flight.
+              cleanup.add(
+                () => Future<void>.delayed(const Duration(milliseconds: 60)),
+              );
+            });
+
+          final container = AppContainer(features: [slow]);
+          addTearDown(container.stop);
+          await container.start();
+
+          final stopFuture = container.stop();
+          // start() during stop must NOT throw — it queues behind stop.
+          final startFuture = container.start();
+
+          await Future.wait([stopFuture, startFuture]);
+          expect(
+            container.status,
+            equals(ContainerStatus.working),
+            reason:
+                'queued start ran after stop and brought the container '
+                'back up on the next cycle',
+          );
+        },
+      );
+
+      test('start() from within a feature callback throws', () async {
+        late AppContainer container;
+        Object? capturedError;
+        final feature = createFeature(name: "self-start")
+          ..onStart((_, _) async {
+            try {
+              await container.start();
+            } on Object catch (e) {
+              capturedError = e;
+            }
+          });
+
+        container = AppContainer(features: [feature]);
+        addTearDown(container.stop);
+
+        await container.start().timeout(const Duration(seconds: 2));
+        expect(capturedError, isA<ContainerUsageError>());
+        expect(container.status, equals(ContainerStatus.working));
+      });
+
+      test('ownActive resets to its construction default after stop', () async {
+        var setupCount = 0;
+        final feature = createFeature(name: "needs-toggle")
+          ..activation((_, toggle, _) async {
+            setupCount++;
+            // Setup runs twice; first cycle activates, second leaves disabled.
+            if (setupCount == 1) {
+              await toggle(ToggleState.active);
+            }
+          });
+
+        final container = AppContainer(features: [feature]);
+        addTearDown(container.stop);
+
+        await container.start();
+        expect(container.statusOf(feature), equals(FeatureStatus.active));
+
+        await container.stop();
+        await container.start();
+
+        // Without ownActive reset, the first cycle's `toggle(.active)`
+        // would persist and the feature would re-activate without setup
+        // running through its non-activating branch. Reset puts it back
+        // to the construction default
+        // (`activationSetup != null ⇒ false`).
+        expect(container.statusOf(feature), equals(FeatureStatus.disabled));
+      });
+    });
+
     group('reentrance', () {
       test(
-        'dispose() called from within an activation setup rejects with ContainerUsageError',
+        'stop() called from within an activation setup rejects with ContainerUsageError',
         () async {
           late AppContainer container;
           Object? capturedError;
-          final feature = createFeature(name: "self-dispose-setup")
+          final feature = createFeature(name: "self-stop-setup")
             ..activation((_, _, _) async {
               try {
-                await container.dispose();
+                await container.stop();
               } on Object catch (e) {
                 capturedError = e;
               }
@@ -268,20 +489,20 @@ Future<void> main() async {
 
           expect(capturedError, isA<ContainerUsageError>());
           expect(container.status, equals(ContainerStatus.working));
-          await container.dispose();
-          expect(container.status, equals(ContainerStatus.disposed));
+          await container.stop();
+          expect(container.status, equals(ContainerStatus.idle));
         },
       );
 
       test(
-        'dispose() called from within onStart rejects with ContainerUsageError',
+        'stop() called from within onStart rejects with ContainerUsageError',
         () async {
           late AppContainer container;
           Object? capturedError;
-          final feature = createFeature(name: "self-dispose-onStart")
+          final feature = createFeature(name: "self-stop-onStart")
             ..onStart((_, _) async {
               try {
-                await container.dispose();
+                await container.stop();
               } on Object catch (e) {
                 capturedError = e;
               }
@@ -292,13 +513,13 @@ Future<void> main() async {
 
           expect(capturedError, isA<ContainerUsageError>());
           expect(container.status, equals(ContainerStatus.working));
-          await container.dispose();
-          expect(container.status, equals(ContainerStatus.disposed));
+          await container.stop();
+          expect(container.status, equals(ContainerStatus.idle));
         },
       );
 
       test(
-        'concurrent dispose() calls during in-flight start collapse to same future',
+        'concurrent stop() calls during in-flight start collapse to same future',
         () async {
           final slow = createFeature(name: "slow")
             ..activation((_, toggle, _) async {
@@ -310,17 +531,17 @@ Future<void> main() async {
           final startFuture = container.start();
           await Future<void>.delayed(const Duration(milliseconds: 20));
 
-          final d1 = container.dispose();
-          final d2 = container.dispose();
+          final d1 = container.stop();
+          final d2 = container.stop();
           expect(
             identical(d1, d2),
             isTrue,
-            reason: 'dispose() is idempotent — two calls share one future',
+            reason: 'stop() is idempotent — two calls share one future',
           );
 
           await startFuture.timeout(const Duration(seconds: 2));
           await Future.wait([d1, d2]).timeout(const Duration(seconds: 2));
-          expect(container.status, equals(ContainerStatus.disposed));
+          expect(container.status, equals(ContainerStatus.idle));
         },
       );
     });
@@ -334,7 +555,7 @@ Future<void> main() async {
         child.usePipe(pipe, (value, api) => value + 1);
 
         final container = AppContainer(features: [root, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         expect(
           () => container.apply(
@@ -347,13 +568,13 @@ Future<void> main() async {
         );
       });
 
-      test('apply() after dispose throws ContainerError', () async {
+      test('apply() after stop throws ContainerError', () async {
         final feature = createFeature(name: "f");
         final pipe = createPipe<int>(name: "p", feature: feature);
         final container = AppContainer(features: [feature]);
         await container.start();
 
-        await container.dispose();
+        await container.stop();
 
         expect(
           () => container.apply(
@@ -400,7 +621,7 @@ Future<void> main() async {
           expect(partial, equals(0));
 
           await startFuture;
-          await container.dispose();
+          await container.stop();
         },
       );
     });

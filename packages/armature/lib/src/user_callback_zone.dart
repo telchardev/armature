@@ -7,7 +7,7 @@ import 'package:meta/meta.dart' show internal;
 ///
 /// Framework code consults `Zone.current[userCallbackZoneKey]` to reject
 /// operations that would self-deadlock when invoked from inside such
-/// a callback — notably `AppContainer.dispose()` awaiting the same
+/// a callback — notably `AppContainer.stop()` awaiting the same
 /// `start()` future whose user callback called it.
 @internal
 const Symbol userCallbackZoneKey = #appKitInsideUserCallback;
@@ -25,7 +25,7 @@ const Symbol userCallbackZoneKey = #appKitInsideUserCallback;
 /// [body] will fire with `userCallbackZoneKey` still set, even after
 /// [runAsUserCallback] has returned. In practice this can produce a
 /// false positive — e.g. a `Timer` registered inside `onStart` that
-/// later calls `container.dispose()` will be rejected as "called
+/// later calls `container.stop()` will be rejected as "called
 /// from a user callback" even though the original `start()` future
 /// has long since settled. The detection is aimed at **synchronous**
 /// self-recursion; treat it as a best-effort guard for detached

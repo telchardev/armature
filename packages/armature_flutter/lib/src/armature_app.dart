@@ -81,13 +81,13 @@ class _ArmatureAppState extends State<ArmatureApp> {
 
   @override
   void dispose() {
-    // AppContainer.dispose() is async (cleanup bags may have async
+    // AppContainer.stop() is async (cleanup bags may have async
     // disposers). Flutter's State.dispose() is sync, so we fire-and-
     // forget — teardown completes after the widget tree is gone. The
     // container carries its own renderer + feature runtime state, so
     // late teardown side effects can't corrupt any concurrent
     // ArmatureApp.
-    unawaited(_container.dispose());
+    unawaited(_container.stop());
     super.dispose();
   }
 

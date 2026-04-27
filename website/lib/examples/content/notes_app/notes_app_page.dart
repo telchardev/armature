@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../docs/doc_typography.dart';
 import '../../../widgets/external_links.dart';
 import '../../../widgets/loaded_code_block.dart';
-import 'counter_widget.dart';
+import 'notes_app_widget.dart';
 
-class CounterExamplePage extends StatelessWidget {
-  const CounterExamplePage({super.key});
+class NotesAppPage extends StatelessWidget {
+  const NotesAppPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -16,17 +16,24 @@ class CounterExamplePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DocTitle('Counter'),
+          const DocTitle('Notes app'),
           const DocParagraph(
-            'A single store holding one integer. Two task strategies drive '
-            'the buttons — a queued increment that serialises async calls, '
-            'and a debounced bump that collapses rapid taps into one write.',
+            'A 5-feature Notes/Todo app — the running example used across '
+            'the docs. Layout owns the Scaffold and four ports (tabs '
+            'pipe, body keyed slot, fab + actions multi slots); Notes / '
+            'Search / Settings each plug a tab; Analytics gates on the '
+            'toggle store and renders a note-count chip in the AppBar.',
+          ),
+          const DocParagraph(
+            'Add a note to see Search activate (whenStoreState on '
+            'notes.items.isNotEmpty). Open Settings → flip Analytics off '
+            'to see the chip disappear via the activation cascade.',
           ),
           const SizedBox(height: 8),
           const _Tabs(),
           const SizedBox(height: 24),
           const SizedBox(
-            height: 560,
+            height: 580,
             child: TabBarView(
               physics: NeverScrollableScrollPhysics(),
               children: [_PreviewTab(), _CodeTab()],
@@ -34,8 +41,9 @@ class CounterExamplePage extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           Text(
-            'See the full multi-feature version in the armature_example '
-            'package on GitHub.',
+            'For a larger multi-feature reference app (auth, admin, '
+            'feature toggles, history, inspector, theming, debug '
+            'overlay), see armature_example.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -90,24 +98,42 @@ class _PreviewTabState extends State<_PreviewTab>
     super.build(context);
     return const Center(
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: _CounterDemoEmbed(),
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: _NotesAppEmbed(),
       ),
     );
   }
 }
 
-/// Embed wrapper — same canonical feature/root from `counter_widget.dart`,
-/// minus the standalone `runApp` + `MaterialApp` wrapping (the website
-/// already provides those).
-class _CounterDemoEmbed extends StatelessWidget {
-  const _CounterDemoEmbed();
+/// Embed-only wrapper — gives the demo a fixed-size phone-ish frame
+/// so it renders nicely inside the website's max-width column. The
+/// canonical user-facing source in `notes_app_widget.dart` skips this
+/// wrapper and uses `runApp(MaterialApp(...))` directly.
+class _NotesAppEmbed extends StatelessWidget {
+  const _NotesAppEmbed();
 
   @override
   Widget build(BuildContext context) {
-    return ArmatureApp(
-      features: [counterFeature],
-      child: counterRoot(data: null),
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 520),
+      height: 540,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ArmatureApp(
+        features: [
+          layoutFeature,
+          notesFeature,
+          searchFeature,
+          featureTogglesFeature,
+          analyticsFeature,
+        ],
+        child: layoutRoot(data: null),
+      ),
     );
   }
 }
@@ -122,14 +148,9 @@ class _CodeTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: const [
-          _Caption('counter_store.dart'),
+          _Caption('notes_app.dart'),
           LoadedCodeBlock(
-            path: 'lib/examples/content/counter/counter_store.dart',
-          ),
-          SizedBox(height: 20),
-          _Caption('counter_widget.dart'),
-          LoadedCodeBlock(
-            path: 'lib/examples/content/counter/counter_widget.dart',
+            path: 'lib/examples/content/notes_app/notes_app_widget.dart',
           ),
         ],
       ),

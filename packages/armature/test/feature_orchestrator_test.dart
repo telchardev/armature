@@ -16,7 +16,7 @@ void main() {
       () async {
         final feature = createFeature(name: "auto");
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
@@ -30,7 +30,7 @@ void main() {
           ..activation((_, _, _) {}); // never starts
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isFalse);
@@ -46,7 +46,7 @@ void main() {
           });
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
@@ -60,7 +60,7 @@ void main() {
           ..activation((_, _, _) {}); // deferred — never auto-activates
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isFalse);
@@ -80,7 +80,7 @@ void main() {
           ..activation((_, _, _) {});
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         expect(
           () => container.toggleFeature(feature, ToggleState.active),
@@ -88,7 +88,7 @@ void main() {
         );
 
         await container.start();
-        await container.dispose();
+        await container.stop();
 
         expect(
           () => container.toggleFeature(feature, ToggleState.active),
@@ -110,7 +110,7 @@ void main() {
           });
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         await savedCtrl(ToggleState.active);
@@ -130,7 +130,7 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(startCalls, equals(1));
@@ -141,7 +141,7 @@ void main() {
       final child = createFeature(name: "child", dependsOn: [parent]);
 
       final container = AppContainer(features: [parent, child]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(container.statusOf(parent) == FeatureStatus.active, isFalse);
@@ -162,7 +162,7 @@ void main() {
         final child = createFeature(name: "child", dependsOn: [parent]);
 
         final container = AppContainer(features: [parent, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(child) == FeatureStatus.active, isTrue);
@@ -187,7 +187,7 @@ void main() {
         )..activation((_, _, _) {});
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         // Eager construct: factory runs once at start, even though the
@@ -212,7 +212,7 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(starts, equals(0));
@@ -236,7 +236,7 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       await container.toggleFeature(feature, ToggleState.inactive);
@@ -261,7 +261,7 @@ void main() {
           features: [feature],
           options: silentOptions(),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         await container.toggleFeature(feature, ToggleState.inactive);
@@ -284,7 +284,7 @@ void main() {
           });
 
         final container = AppContainer(features: [feature]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         await container.toggleFeature(feature, ToggleState.inactive);
@@ -294,7 +294,7 @@ void main() {
       },
     );
 
-    test('lifetime cleanup bag runs on AppContainer.dispose', () async {
+    test('lifetime cleanup bag runs on AppContainer.stop', () async {
       var disposed = false;
       final feature = createFeature(name: "bag")
         ..activation((_, _, cleanup) {
@@ -302,11 +302,11 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(disposed, isFalse);
-      await container.dispose();
+      await container.stop();
       expect(disposed, isTrue);
     });
 
@@ -318,7 +318,7 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       // container.start() awaits all setups — feature should be active now.
@@ -329,7 +329,7 @@ void main() {
       final feature = createFeature(name: "sync-onstart")..onStart((_, _) {});
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(container.statusOf(feature) == FeatureStatus.pending, isFalse);
@@ -346,7 +346,7 @@ void main() {
         });
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       final startFuture = container.start();
 
       // Wait for onStart to actually begin awaiting.
@@ -375,7 +375,7 @@ void main() {
         });
 
       final container = AppContainer(features: [parent, child]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(events, equals(['parent-begin', 'parent-end', 'child']));
@@ -396,7 +396,7 @@ void main() {
             },
           ),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(container.statusOf(feature) == FeatureStatus.active, isFalse);
@@ -439,7 +439,7 @@ void main() {
             });
 
           final container = AppContainer(features: [a, b, c]);
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
           await container.start();
 
           expect(container.statusOf(a) == FeatureStatus.active, isTrue);

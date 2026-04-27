@@ -13,25 +13,13 @@ final counterFeature = createFeature(
   exports: (api) => api.own,
 );
 
-final _counterRoot = createFeatureRoot(
+final counterRoot = createFeatureRoot(
   feature: counterFeature,
-  widget: const _CounterView(),
+  widget: const CounterView(),
 );
 
-class CounterDemoWidget extends StatelessWidget {
-  const CounterDemoWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ArmatureApp(
-      features: [counterFeature],
-      child: _counterRoot(data: null),
-    );
-  }
-}
-
-class _CounterView extends StatelessWidget {
-  const _CounterView();
+class CounterView extends StatelessWidget {
+  const CounterView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -90,4 +78,13 @@ class _CounterView extends StatelessWidget {
       ),
     );
   }
+}
+
+void main() {
+  runApp(
+    ArmatureApp(
+      features: [counterFeature],
+      child: MaterialApp(home: counterRoot(data: null)),
+    ),
+  );
 }

@@ -65,7 +65,7 @@ void main() {
       );
 
       final container = AppContainer(features: [firstFeature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final stores =
@@ -88,7 +88,7 @@ void main() {
       );
 
       var container = AppContainer(features: [firstFeature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(factoredRepositories, equals(repositories));
@@ -97,7 +97,7 @@ void main() {
     test('feature without storesFactory has null stores', () async {
       final feature = createFeature(name: "bare");
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(container.runtimeOf(feature).scopeApi.stores, isNull);
@@ -117,7 +117,7 @@ void main() {
         features: [feature],
         options: silentOptions(),
       );
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       // Factory throws during tracking → fail-fast aborts start().
       await expectLater(
@@ -151,7 +151,7 @@ void main() {
             });
 
       final container = AppContainer(features: [firstFeature, secondFeature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
     });
 
@@ -171,7 +171,7 @@ void main() {
           });
 
         final container = AppContainer(features: [featureA, featureB, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
       },
     );
@@ -192,7 +192,7 @@ void main() {
           });
 
         final container = AppContainer(features: [stranger, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(thrown, isA<FeatureResolutionError>());
@@ -224,7 +224,7 @@ void main() {
               });
 
         final container = AppContainer(features: [optional, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(seenUser, isNotNull);
@@ -255,7 +255,7 @@ void main() {
         });
 
       final container = AppContainer(features: [parent, child]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(parentAccessWorked, isTrue);
@@ -264,7 +264,7 @@ void main() {
     test('feature with no dependsOn resolves as root', () async {
       final feature = createFeature(name: "standalone");
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(container.statusOf(feature) == FeatureStatus.active, isTrue);
@@ -294,7 +294,7 @@ void main() {
           }),
         ],
       );
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       await container.start();
 
@@ -309,7 +309,7 @@ void main() {
       );
 
       final container = AppContainer(features: [feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       expect(
@@ -359,7 +359,7 @@ void main() {
           features: [feature],
           options: silentOptions(),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await expectLater(
           container.start,
@@ -408,7 +408,7 @@ void main() {
         );
 
         final container = AppContainer(features: [parent, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         expect(capturedInChildFactory, same(parentService));
@@ -438,7 +438,7 @@ void main() {
           features: [parent, child],
           options: silentOptions(),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         // Fail-fast on the parent factory throw — child factory never
         // runs because the construct phase bails on the first error.
@@ -471,7 +471,7 @@ void main() {
           features: [optionalParent, child],
           options: silentOptions(),
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         // Optional vs required parent only differs at cascade time
         // (activation / deactivation). Factory failures are binary:
@@ -511,7 +511,7 @@ void main() {
       });
 
       var container = AppContainer(features: [pipeFeature, feature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       container.onPortChanged(port: intPipe, callback: listeners.onPortChanged);
 

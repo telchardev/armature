@@ -129,12 +129,12 @@ void main() {
       },
     );
 
-    test('dispose clears all listeners', () {
+    test('clear clears all listeners', () {
       final emitter = _emitter<String>();
       var calls = 0;
       emitter.add('event', () => calls++);
 
-      emitter.dispose();
+      emitter.clear();
       emitter.emit('event');
 
       expect(calls, equals(0));

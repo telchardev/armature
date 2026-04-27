@@ -13,31 +13,19 @@ final searchFeature = createFeature(
   exports: (api) => api.own,
 );
 
-final _searchRoot = createFeatureRoot(
+final searchRoot = createFeatureRoot(
   feature: searchFeature,
-  widget: const _SearchView(),
+  widget: const SearchView(),
 );
 
-class SearchDemoWidget extends StatelessWidget {
-  const SearchDemoWidget({super.key});
+class SearchView extends StatefulWidget {
+  const SearchView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ArmatureApp(
-      features: [searchFeature],
-      child: _searchRoot(data: null),
-    );
-  }
+  State<SearchView> createState() => _SearchViewState();
 }
 
-class _SearchView extends StatefulWidget {
-  const _SearchView();
-
-  @override
-  State<_SearchView> createState() => _SearchViewState();
-}
-
-class _SearchViewState extends State<_SearchView> {
+class _SearchViewState extends State<SearchView> {
   // Plain TextEditingController — UI state, widget-owned.
   late final TextEditingController _input;
 
@@ -193,4 +181,13 @@ class _SearchViewState extends State<_SearchView> {
       ),
     );
   }
+}
+
+void main() {
+  runApp(
+    ArmatureApp(
+      features: [searchFeature],
+      child: MaterialApp(home: searchRoot(data: null)),
+    ),
+  );
 }

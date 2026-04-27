@@ -45,8 +45,8 @@ sealed class ArmatureError extends Error {
 }
 
 /// Thrown when an [AppContainer] operation is invoked in the wrong
-/// lifecycle state — e.g. `start()` on a disposed container, `apply()`
-/// before `start()`.
+/// lifecycle state — e.g. double `start()` without an intervening
+/// `stop()`, `apply()` before `start()`.
 final class ContainerError extends ArmatureError {
   ContainerError(super.message, {super.stackTrace});
 
@@ -55,7 +55,7 @@ final class ContainerError extends ArmatureError {
 }
 
 /// Thrown when [AppContainer] is used in a way that can only be a bug
-/// in calling code: `dispose()` from inside a user callback (would
+/// in calling code: `stop()` from inside a user callback (would
 /// self-deadlock), reaching into orchestrator internals before `start()`,
 /// etc.
 final class ContainerUsageError extends ArmatureError {

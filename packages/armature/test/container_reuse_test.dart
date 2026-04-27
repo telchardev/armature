@@ -47,7 +47,7 @@ void main() {
           data: null,
         );
         expect(v1, equals('seed[contrib]'));
-        await c1.dispose();
+        await c1.stop();
 
         // --- Second lifecycle with the same top-level instances ---
         final c2 = AppContainer(features: [_reuseHost, _reuseContributor]);
@@ -61,10 +61,10 @@ void main() {
           data: null,
         );
         // Regression guard: before the fix, the contributor's handler was
-        // deregistered on c1.dispose() and never re-registered — c2 saw
+        // deregistered on c1.stop() and never re-registered — c2 saw
         // `seed` only.
         expect(v2, equals('seed[contrib]'));
-        await c2.dispose();
+        await c2.stop();
       },
     );
 
@@ -86,7 +86,7 @@ void main() {
         await c1.start();
         final s1 = feature.storeOf<_Svc>(c1);
         expect(factoryInvocations, equals(1));
-        await c1.dispose();
+        await c1.stop();
 
         final c2 = AppContainer(features: [feature]);
         await c2.start();
@@ -94,7 +94,7 @@ void main() {
         expect(factoryInvocations, equals(2));
         // Fresh stores on each start — not the disposed instances from c1.
         expect(identical(s1, s2), isFalse);
-        await c2.dispose();
+        await c2.stop();
       },
     );
 
@@ -108,7 +108,7 @@ void main() {
         final c1 = AppContainer(features: [host]);
         await c1.start();
         expect(c1.statusOf(host), equals(FeatureStatus.active));
-        await c1.dispose();
+        await c1.stop();
 
         final c2 = AppContainer(features: [host]);
         // Before the fix, statusStore was `.dispose()`d on c1 teardown and
@@ -116,7 +116,7 @@ void main() {
         // disabled in c2.
         await c2.start();
         expect(c2.statusOf(host), equals(FeatureStatus.active));
-        await c2.dispose();
+        await c2.stop();
       },
     );
 
@@ -134,17 +134,17 @@ void main() {
       final c1 = AppContainer(features: [feature]);
       await c1.start();
       expect(onStartCount, equals(1));
-      await c1.dispose();
+      await c1.stop();
 
       final c2 = AppContainer(features: [feature]);
       await c2.start();
       expect(onStartCount, equals(2));
-      await c2.dispose();
+      await c2.stop();
 
       final c3 = AppContainer(features: [feature]);
       await c3.start();
       expect(onStartCount, equals(3));
-      await c3.dispose();
+      await c3.stop();
     });
 
     test(
@@ -161,17 +161,17 @@ void main() {
         await c1.start();
         expect(activationCount, equals(1));
         expect(c1.statusOf(feature), equals(FeatureStatus.active));
-        await c1.dispose();
+        await c1.stop();
 
         final c2 = AppContainer(features: [feature]);
         await c2.start();
         expect(activationCount, equals(2));
         expect(c2.statusOf(feature), equals(FeatureStatus.active));
-        await c2.dispose();
+        await c2.stop();
       },
     );
 
-    test('statusStore listeners from a disposed container do not leak to '
+    test('statusStore listeners from a stopped container do not leak to '
         'the next container', () async {
       final feature = createFeature(name: 'statusListenerCleanup');
       final c1 = AppContainer(features: [feature]);
@@ -184,18 +184,18 @@ void main() {
       final transitions = <FeatureStatus>[];
       s1.subscribe((_, FeatureStatus next) => transitions.add(next));
 
-      await c1.dispose();
+      await c1.stop();
       final snapshot = transitions.length;
 
       final c2 = AppContainer(features: [feature]);
       await c2.start();
 
       // c2's runtime holds a *fresh* statusStore, independent from c1's
-      // disposed instance. No writes from c2's activation reach s1.
+      // stopped instance. No writes from c2's activation reach s1.
       expect(transitions.length, equals(snapshot));
       expect(identical(c2.runtimeOf(feature).statusStore, s1), isFalse);
       expect(c2.statusOf(feature), equals(FeatureStatus.active));
-      await c2.dispose();
+      await c2.stop();
     });
   });
 
@@ -211,8 +211,8 @@ void main() {
       await c1.start();
       final c2 = AppContainer(features: [feature], options: silentOptions());
       await c2.start();
-      addTearDown(c1.dispose);
-      addTearDown(c2.dispose);
+      addTearDown(c1.stop);
+      addTearDown(c2.stop);
 
       final s1 = c1.runtimeOf(feature).scopeApi.store<_CounterStore>();
       final s2 = c2.runtimeOf(feature).scopeApi.store<_CounterStore>();
@@ -231,8 +231,8 @@ void main() {
       await c1.start();
       final c2 = AppContainer(features: [feature], options: silentOptions());
       await c2.start();
-      addTearDown(c1.dispose);
-      addTearDown(c2.dispose);
+      addTearDown(c1.stop);
+      addTearDown(c2.stop);
 
       expect(
         identical(
@@ -259,8 +259,8 @@ void main() {
         options: silentOptions(),
       );
       await c2.start();
-      addTearDown(c1.dispose);
-      addTearDown(c2.dispose);
+      addTearDown(c1.stop);
+      addTearDown(c2.stop);
 
       final h1 = c1.handlersOf(pipe);
       final h2 = c2.handlersOf(pipe);
@@ -281,12 +281,12 @@ void main() {
       await c1.start();
       final c2 = AppContainer(features: [feature], options: silentOptions());
       await c2.start();
-      addTearDown(c2.dispose);
+      addTearDown(c2.stop);
 
       final c2Store = c2.runtimeOf(feature).scopeApi.store<_CounterStore>();
       // Fire-and-forget dispose of c1, then immediately exercise c2.
       // ignore: unawaited_futures
-      c1.dispose();
+      c1.stop();
 
       c2Store.inc();
       expect(c2Store.state, equals(1));
@@ -311,9 +311,9 @@ void main() {
           options: silentOptions(),
         );
         await c2.start();
-        addTearDown(c2.dispose);
+        addTearDown(c2.stop);
 
-        await c1.dispose();
+        await c1.stop();
 
         // c2 is still fully functional — its handler map survived.
         expect(c2.handlersOf(pipe).length, equals(1));
@@ -351,7 +351,7 @@ void main() {
           equals(1),
           reason: 'handler reinstalled in cycle $i',
         );
-        await c.dispose();
+        await c.stop();
         // Config is read-only for container lifecycle — must be byte-
         // for-byte the same across cycles.
         expect(contributor.config.portBindings.length, equals(snapshotCount));

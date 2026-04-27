@@ -44,14 +44,14 @@ void main() {
       final c = AppContainer(features: [_topLevelBlockBody]);
       await c.start();
       expect(c.statusOf(_topLevelBlockBody) == FeatureStatus.active, isTrue);
-      await c.dispose();
+      await c.stop();
     });
 
     test('onStart with (_, _) => null arrow activates cleanly', () async {
       final c = AppContainer(features: [_topLevelArrowNull]);
       await c.start();
       expect(c.statusOf(_topLevelArrowNull) == FeatureStatus.active, isTrue);
-      await c.dispose();
+      await c.stop();
     });
 
     test('activation with 3-param block body activates cleanly', () async {
@@ -61,7 +61,7 @@ void main() {
         c.statusOf(_topLevelActivationBlock) == FeatureStatus.active,
         isTrue,
       );
-      await c.dispose();
+      await c.stop();
     });
   });
 }

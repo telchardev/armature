@@ -29,7 +29,7 @@ void main() {
       var container = AppContainer(
         features: [pipeFeature, firstFeature, secondFeature],
       );
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       await container.start();
 
@@ -70,7 +70,7 @@ void main() {
       var container = AppContainer(
         features: [pipeFeature, firstFeature, secondFeature],
       );
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
 
       await container.start();
 
@@ -95,7 +95,7 @@ void main() {
         ..usePipe(pipe, (v, _) => v + 5);
 
       final container = AppContainer(features: [root, a, b]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       // (1 * 2) + 5 == 7.
@@ -114,7 +114,7 @@ void main() {
       final root = createFeature(name: "root");
       final pipe = createPipe<int>(name: "empty", feature: root);
       final container = AppContainer(features: [root]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final result = container.apply(

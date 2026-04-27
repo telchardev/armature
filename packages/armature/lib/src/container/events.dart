@@ -19,8 +19,9 @@ typedef ListenerErrorReporter =
       Map<String, String> meta,
     );
 
-/// Bundle of container-scoped event emitters. Disposed as a unit by
-/// [AppContainer.dispose]. External listeners subscribe through
+/// Bundle of container-scoped event emitters. Listeners are dropped
+/// as a unit by [clearListeners] on every [AppContainer.stop].
+/// External listeners subscribe through
 /// [AppContainer.onFeatureStatusChanged] and [AppContainer.onPortChanged].
 ///
 /// Listener exceptions are captured and forwarded to
@@ -68,8 +69,10 @@ class Events {
         ),
       );
 
-  void dispose() {
-    featureStatusChanged.dispose();
-    portChanged.dispose();
+  /// Drops every listener registered on either emitter. Subsequent
+  /// `emit` calls are no-ops until external code re-subscribes.
+  void clearListeners() {
+    featureStatusChanged.clear();
+    portChanged.clear();
   }
 }

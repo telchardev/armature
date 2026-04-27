@@ -32,3 +32,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/examples/content/counter/counter_store.dart
+    - lib/examples/content/counter/counter_widget.dart
+    - lib/examples/content/todo_list/todo_store.dart
+    - lib/examples/content/todo_list/todo_widget.dart
+    - lib/examples/content/debounced_search/search_store.dart
+    - lib/examples/content/debounced_search/search_widget.dart
+    - lib/examples/content/feature_toggles/toggle_demo.dart
+    - lib/examples/content/notes_app/notes_app_widget.dart

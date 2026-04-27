@@ -27,7 +27,8 @@ class MentalModelContent extends StatelessWidget {
           'dependency graph, the lifecycle, the error handler, and the '
           'logger. You rarely interact with it directly — ArmatureApp '
           'builds it from your feature list, features live inside it, '
-          'and dispose() tears everything down at the end.',
+          'and stop() tears everything down (start/stop is reusable — '
+          'each start gets a fresh set of stores).',
         ),
         const DocSubheading('Features'),
         const DocParagraph(

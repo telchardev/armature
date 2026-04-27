@@ -191,8 +191,8 @@ class _ContribCard extends StatelessWidget {
   }
 }
 
-class _HostView extends StatelessWidget {
-  const _HostView();
+class HostView extends StatelessWidget {
+  const HostView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -284,35 +284,22 @@ class _ToggleTile extends StatelessWidget {
   }
 }
 
-final _hostRoot = createFeatureRoot(
+final hostRoot = createFeatureRoot(
   feature: toggleHostFeature,
-  widget: const _HostView(),
+  widget: const HostView(),
 );
 
-class FeatureTogglesDemoWidget extends StatelessWidget {
-  const FeatureTogglesDemoWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      constraints: const BoxConstraints(maxWidth: 480),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: ArmatureApp(
-        features: [
-          toggleHostFeature,
-          betaFeature,
-          analyticsFeature,
-          debugFeature,
-          tipsFeature,
-        ],
-        child: _hostRoot(data: null),
-      ),
-    );
-  }
+void main() {
+  runApp(
+    ArmatureApp(
+      features: [
+        toggleHostFeature,
+        betaFeature,
+        analyticsFeature,
+        debugFeature,
+        tipsFeature,
+      ],
+      child: MaterialApp(home: hostRoot(data: null)),
+    ),
+  );
 }

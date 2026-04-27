@@ -41,7 +41,7 @@ void main() {
     });
 
     final container = AppContainer(features: [owner, child]);
-    addTearDown(container.dispose);
+    addTearDown(container.stop);
     await container.start();
 
     var subAChanges = 0;
@@ -109,7 +109,7 @@ void main() {
       toggleable.activation((_, _, _) {});
 
       final container = AppContainer(features: [owner, toggleable]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       var changes = 0;

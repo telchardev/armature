@@ -86,11 +86,11 @@ class DependencyGraphContent extends StatelessWidget {
         ),
         const DocHeading('Deactivation'),
         const DocParagraph(
-          'On container disposal the cascade runs in reverse topological '
+          'On container stop the cascade runs in reverse topological '
           'order: children tear down first, then parents. Each feature '
           'drains its cleanup bag (LIFO) before its parents do theirs, '
           'so a child never tries to read a parent store after that '
-          'parent has started to dispose.',
+          'parent has started to tear down.',
         ),
         const DocHeading('Errors at construction'),
         const DocParagraph(

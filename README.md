@@ -124,8 +124,8 @@ flowchart TB
 
 ## Where to go next
 
-- **[Documentation site](https://telchardev.github.io/armature/)** — full guide: mental model, glossary, every concept walked through with a Notes/Todo example.
-- **[examples/armature_example](examples/armature_example)** — a multi-feature reference app exercising every piece of the framework (auth, admin, feature toggles, history, inspector, theming, debug overlay).
+- **[Documentation site](https://telchardev.github.io/armature/)** — full guide: mental model, glossary, every concept walked through with a Notes/Todo example. The 5-feature Notes app lives in the **Examples → Notes app** section as a live preview with the full source.
+- **[examples/armature_example](examples/armature_example)** — a larger multi-feature reference app exercising every piece of the framework (auth, admin, feature toggles, history, inspector, theming, debug overlay).
 - **API reference** — [armature](https://pub.dev/documentation/armature/latest/) · [armature_flutter](https://pub.dev/documentation/armature_flutter/latest/) · [armature_reactive](https://pub.dev/documentation/armature_reactive/latest/) · [armature_graph](https://pub.dev/documentation/armature_graph/latest/)
 
 ---

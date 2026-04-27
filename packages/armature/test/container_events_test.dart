@@ -45,7 +45,7 @@ Future<void> main() async {
           var container = AppContainer(
             features: [pipeFeature, feature1, feature2],
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           container.onFeatureStatusChanged(
             feature: feature1,
@@ -86,7 +86,7 @@ Future<void> main() async {
         () async {
           final feature = createFeature(name: "f");
           final container = AppContainer(features: [feature]);
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           var count = 0;
           final dispose = container.onFeatureStatusChanged(
@@ -108,7 +108,7 @@ Future<void> main() async {
           ..usePipe(pipe, (v, _) => v + 1);
 
         final container = AppContainer(features: [root, child]);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         var count = 0;
         final dispose = container.onPortChanged(
@@ -141,7 +141,7 @@ Future<void> main() async {
             ..usePipe(pipe, (v, _) => v + 3);
 
           final container = AppContainer(features: [root, f1, f2, f3]);
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
           container.onPortChanged(
             port: pipe,
             callback: listeners.onPortChanged,
@@ -173,7 +173,7 @@ Future<void> main() async {
         final container = AppContainer(
           features: [pipeFeature, enabled, disabled],
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         container.onPortChanged(port: pipe, callback: listeners.onPortChanged);
 
         await container.start();
@@ -197,7 +197,7 @@ Future<void> main() async {
               },
             ),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           var secondRan = false;
           container.onFeatureStatusChanged(
@@ -238,7 +238,7 @@ Future<void> main() async {
               },
             ),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           container.onPortChanged(
             port: pipe,
@@ -268,7 +268,7 @@ Future<void> main() async {
               },
             ),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           var survivorRan = false;
           container.onFeatureStatusChanged(
@@ -306,7 +306,7 @@ Future<void> main() async {
         expect(() async {
           final container = AppContainer(features: [createFeature(name: "f")]);
           await container.start();
-          await container.dispose();
+          await container.stop();
         }, returnsNormally);
       });
 
@@ -318,8 +318,8 @@ Future<void> main() async {
           // kill the other's warning.
           final c1 = AppContainer(features: [createFeature(name: "a")]);
           final c2 = AppContainer(features: [createFeature(name: "b")]);
-          addTearDown(c1.dispose);
-          addTearDown(c2.dispose);
+          addTearDown(c1.stop);
+          addTearDown(c2.stop);
           await c1.start();
           await c2.start();
           // No exception from overlapping attach + detach on the static
@@ -354,7 +354,7 @@ Future<void> main() async {
             features: features,
             options: silentOptions(maxResolveConcurrency: 3),
           );
-          addTearDown(container.dispose);
+          addTearDown(container.stop);
 
           await container.start();
 
@@ -378,7 +378,7 @@ Future<void> main() async {
         ];
 
         final container = AppContainer(features: features);
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
 
         await container.start();
 

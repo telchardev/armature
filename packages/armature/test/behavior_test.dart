@@ -23,7 +23,7 @@ void main() {
       });
 
       final container = AppContainer(features: [behaviorFeature, firstFeature]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final result = container.apply(
@@ -70,7 +70,7 @@ void main() {
         final container = AppContainer(
           features: [behaviorFeature, firstFeature, secondFeature],
         );
-        addTearDown(container.dispose);
+        addTearDown(container.stop);
         await container.start();
 
         final result = container.apply(
@@ -94,7 +94,7 @@ void main() {
         feature: root,
       );
       final container = AppContainer(features: [root]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final initial = BehaviorDescriptor(
@@ -130,7 +130,7 @@ void main() {
       }, priority: 1);
 
       final container = AppContainer(features: [root, feature1, feature2]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final result = container.apply(
@@ -159,7 +159,7 @@ void main() {
       f2.useBehavior(behavior, (_) => null);
 
       final container = AppContainer(features: [root, f1, f2]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final initial = BehaviorDescriptor(
@@ -197,7 +197,7 @@ void main() {
       );
 
       final container = AppContainer(features: [root, enabled, gated]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final result = container.apply(
@@ -226,7 +226,7 @@ void main() {
       });
 
       final container = AppContainer(features: [root, feature1]);
-      addTearDown(container.dispose);
+      addTearDown(container.stop);
       await container.start();
 
       final initial = BehaviorDescriptor(
