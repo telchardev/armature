@@ -7,7 +7,7 @@ import 'package:flutter/widgets.dart';
 import './_start_failure.dart' show reportStartFailure;
 import './renderer/flutter_renderer.dart'
     show FlutterRenderer, FlutterRendererOptions;
-import './renderer/renderer.dart' show Renderer;
+import './renderer/renderer.dart' show RenderRootResult, Renderer;
 import './renderer/renderer_context.dart' show ContainerRenderer;
 
 /// Top-level widget that bootstraps the armature container and provides
@@ -51,6 +51,8 @@ class ArmatureApp extends StatefulWidget {
 class _ArmatureAppState extends State<ArmatureApp> {
   late final AppContainer _container;
 
+  late final RenderRootResult _renderRoot;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +68,7 @@ class _ArmatureAppState extends State<ArmatureApp> {
             options: widget.renderOptions ?? FlutterRendererOptions(),
           ),
     );
+    _renderRoot = _container.renderer.renderRoot(container: _container);
 
     unawaited(
       _container.start().catchError(
@@ -93,7 +96,6 @@ class _ArmatureAppState extends State<ArmatureApp> {
 
   @override
   Widget build(BuildContext context) {
-    final renderRoot = _container.renderer.renderRoot(container: _container);
-    return renderRoot(child: widget.child);
+    return _renderRoot(child: widget.child);
   }
 }

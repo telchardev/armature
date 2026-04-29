@@ -1,6 +1,6 @@
-import 'package:armature/advanced.dart' show Port, PortType;
 import 'package:armature/armature.dart'
     show AppContainer, Feature, FeatureHandlerContext, FeatureStatus;
+import 'package:armature/framework.dart' show Port, PortType;
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:meta/meta.dart' show internal;
 
@@ -44,6 +44,12 @@ typedef MultiSlotHandler<TInputData> =
 /// Port that collects contributions from every active feature and
 /// renders **all** of them as a list, sorted by
 /// [MultiSlotDescriptor.order] in [orderDirection].
+typedef _MultiSlotComparator =
+    int Function(
+      ({int order, Widget widget}) a,
+      ({int order, Widget widget}) b,
+    );
+
 class MultiSlot<
   TInputData extends Object?,
   THandler extends MultiSlotHandler<TInputData>
@@ -51,9 +57,26 @@ class MultiSlot<
     extends Port<List<Widget>, TInputData, THandler> {
   final MultiSlotOrderDirection orderDirection;
 
+  /// Comparator pre-bound from [orderDirection] at construction so
+  /// `apply` skips the enum check per pairwise compare.
+  final _MultiSlotComparator _comparator;
+
   @internal
   MultiSlot({required this.orderDirection, required super.name, super.owner})
-    : super(type: PortType.multiSlot);
+    : _comparator = orderDirection == MultiSlotOrderDirection.asc
+          ? _ascByOrder
+          : _descByOrder,
+      super(type: PortType.multiSlot);
+
+  static int _ascByOrder(
+    ({int order, Widget widget}) a,
+    ({int order, Widget widget}) b,
+  ) => a.order - b.order;
+
+  static int _descByOrder(
+    ({int order, Widget widget}) a,
+    ({int order, Widget widget}) b,
+  ) => b.order - a.order;
 
   @internal
   @override
@@ -62,9 +85,11 @@ class MultiSlot<
     required AppContainer container,
     required TInputData data,
   }) {
+    final handlers = container.handlersOf(this);
+    if (handlers.isEmpty) return initialValue;
+
     final entries = <({int order, Widget widget})>[];
 
-    final handlers = container.handlersOf(this);
     for (final MapEntry(:key, :value) in handlers.entries) {
       if (container.statusOf(key) != FeatureStatus.active) continue;
 
@@ -90,13 +115,8 @@ class MultiSlot<
       entries.add((order: descriptor.order, widget: widget));
     }
 
-    if (entries.length > 1) {
-      entries.sort(
-        (a, b) => orderDirection == MultiSlotOrderDirection.asc
-            ? a.order - b.order
-            : b.order - a.order,
-      );
-    }
+    if (entries.isEmpty) return initialValue;
+    if (entries.length > 1) entries.sort(_comparator);
 
     final result = List<Widget>.of(initialValue, growable: true);
     for (final e in entries) {

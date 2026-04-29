@@ -1,4 +1,5 @@
-import 'package:armature/advanced.dart' show BehaviorHandler, PipeHandler, Port;
+import 'package:armature/advanced.dart' show BehaviorHandler, PipeHandler;
+import 'package:armature/framework.dart' show Port;
 import 'package:armature/armature.dart'
     show
         AppContainer,
@@ -181,6 +182,19 @@ class _MultiPortBuilderState extends State<MultiPortBuilder>
     with SafeSetStateMixin {
   late final Reaction _reaction;
 
+  /// Ports the reader touched in the current build. Cleared at the
+  /// start of every [build]; held as an instance field so we don't
+  /// allocate a fresh set per build.
+  final Set<_AnyPort> _tracked = {};
+
+  /// Scratch list reused by [_reconcile] to collect ports dropped
+  /// between builds. Cleared at the start of every reconcile call.
+  final List<_AnyPort> _stale = [];
+
+  /// Bound once in [initState] and reused across builds — equivalent
+  /// closure was previously rebuilt every [build].
+  late final _ReportError _reportError;
+
   /// Per-port handler-set subscription disposers, keyed by the port
   /// the reader touched. Reconciled on every build so a port dropped
   /// between builds releases its subscription; a newly-read port
@@ -191,17 +205,20 @@ class _MultiPortBuilderState extends State<MultiPortBuilder>
   void initState() {
     super.initState();
     _reaction = Reaction(onInvalidate: safeSetState);
+    _reportError = (f, err) {
+      ContainerContext.of(
+        context,
+      ).container.reportError(feature: f, error: err);
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     final container = ContainerContext.of(context).container;
     final feature = FeatureContext.of(context).feature;
-    final tracked = <_AnyPort>{};
+    _tracked.clear();
 
-    final reader = PortReader._(container, feature, tracked, (f, err) {
-      container.reportError(feature: f, error: err);
-    });
+    final reader = PortReader._(container, feature, _tracked, _reportError);
 
     late Widget result;
     try {
@@ -210,16 +227,16 @@ class _MultiPortBuilderState extends State<MultiPortBuilder>
       });
       return result;
     } finally {
-      _reconcile(container, tracked);
+      _reconcile(container, _tracked);
     }
   }
 
   void _reconcile(AppContainer container, Set<_AnyPort> tracked) {
-    final stale = <_AnyPort>[];
+    _stale.clear();
     for (final port in _handlerSubs.keys) {
-      if (!tracked.contains(port)) stale.add(port);
+      if (!tracked.contains(port)) _stale.add(port);
     }
-    for (final port in stale) {
+    for (final port in _stale) {
       _handlerSubs.remove(port)!();
     }
     for (final port in tracked) {

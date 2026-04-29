@@ -1,4 +1,4 @@
-import 'package:armature/advanced.dart' show ContainerDebugExt;
+import 'package:armature/advanced.dart' show ContainerDebugExtensions;
 import 'package:armature/armature.dart';
 import 'package:test/test.dart';
 

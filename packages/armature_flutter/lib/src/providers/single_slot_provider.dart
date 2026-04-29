@@ -1,4 +1,4 @@
-import 'package:armature/advanced.dart' show PortSubscription;
+import 'package:armature/framework.dart' show PortSubscription;
 import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, State;
 
@@ -63,8 +63,7 @@ class _SingleSlotProviderState<TInputData>
     if (widget.slot != oldWidget.slot) {
       resubscribe();
     } else if (widget.data != oldWidget.data) {
-      // Same slot, new data — reapply keeps the Reaction +
-      // handler-set listener alive and just re-runs `port.apply`.
+      // Same slot, new data — reuse the existing subscription.
       subscription?.reapply(initialValue: null, data: widget.data);
     }
   }

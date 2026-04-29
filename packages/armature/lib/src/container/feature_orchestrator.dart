@@ -65,19 +65,14 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   /// applies every toggle in one cascade.
   bool _inSetupPhase = false;
 
-  /// FIFO buffer of [_onToggle] calls awaiting cascade dispatch. Each
-  /// entry carries the feature whose [Graph.recompute] will run plus
-  /// the [Completer] returned synchronously to the caller. The drain
-  /// loop pops one entry at a time and `await`s its recompute, so two
-  /// rapid toggles on different features are observed in invocation
-  /// order even when the second is issued from inside the first's
-  /// lifecycle callbacks.
+  /// FIFO buffer of `toggle` requests. The drain loop pops one entry
+  /// at a time and awaits its recompute, so toggles are observed in
+  /// invocation order even when issued from inside lifecycle callbacks.
   final Queue<_PendingToggle> _pendingToggles = Queue<_PendingToggle>();
 
-  /// Whether [_drainPendingToggles] is currently running. Re-entrant
-  /// `_onToggle` calls (e.g. from inside an `onStart` body) observe
-  /// this flag, append to [_pendingToggles] and return the completer's
-  /// future without spawning a parallel drain.
+  /// Set while [_drainPendingToggles] is running. Re-entrant toggles
+  /// see this and append to the queue instead of spawning a parallel
+  /// drain.
   bool _draining = false;
 
   /// Current lifecycle status of [feature]. `FeatureStatus.disabled`
@@ -224,8 +219,8 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
     host.runtimeOf(feature).updateStatusStore(host.statusOf(feature));
     if (newStatus == GraphNodeStatus.pending) return;
     host.emitFeatureStatusChanged(feature);
-    // Snapshot the port set before iterating.
-    for (final port in feature.config.ports.toList(growable: false)) {
+
+    for (final port in feature.config.portsSnapshot) {
       host.emitPortChanged(port);
     }
   }
@@ -286,11 +281,19 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
 
     if (!_draining) {
       _draining = true;
+      // Defer to the next microtask so the surrounding sync execution
+      // unwinds first — `Graph._chainCascade` sets `_activeCascade`
+      // after its async body yields, and a synchronous recompute from
+      // a re-entrant toggle would race past that publish point.
       scheduleMicrotask(() => unawaited(_drainPendingToggles()));
     }
     return completer.future;
   }
 
+  /// Pops [_pendingToggles] one at a time and awaits each
+  /// [Graph.recompute]. Per-entry errors route to the entry's
+  /// completer so siblings keep draining; a stopping container
+  /// short-circuits remaining entries to silent completion.
   Future<void> _drainPendingToggles() async {
     try {
       while (_pendingToggles.isNotEmpty) {

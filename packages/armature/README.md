@@ -162,13 +162,17 @@ Everything user-actionable reaches `ContainerOptions.errorHandler`:
 
 ## Advanced surface
 
-`package:armature/armature.dart` exposes the ~25 symbols you need to author features, stores, tasks, and ports. Framework plumbing — handler / listener typedefs (`BehaviorHandler`, `PipeHandler`, `TaskFn`, `StateChangeListener`, ...), port base classes (`Port`, `AnyPort`, `PortType`, `PortSubscription`), individual `TaskStrategy*` constructor classes, debug-overlay mirrors, and `LoggerDebugInfo` — lives in a separate barrel:
+`package:armature/armature.dart` exposes the ~25 symbols you need to author features, stores, tasks, and ports. Two extra barrels exist for narrower needs:
 
 ```dart
-import 'package:armature/advanced.dart';
+import 'package:armature/advanced.dart';   // application-level escape hatch
+import 'package:armature/framework.dart';  // sibling-package plumbing
 ```
 
-Reach for it when you need to type-annotate a handler field, build a custom debug overlay, or extend the framework. Day-to-day feature / store code should not need this import.
+* **`advanced.dart`** — handler / listener typedefs (`BehaviorHandler`, `PipeHandler`, `TaskFn`, `StateChangeListener`, ...), individual `TaskStrategy*` constructor classes, debug-overlay mirrors (`ContainerDebug`, `FeatureDebugInfo`, `PortDebugInfo`), and `LoggerDebugInfo`. Reach for it when you need to type-annotate a handler field, build a custom debug overlay, or implement a custom `Logger`.
+* **`framework.dart`** — base port hierarchy (`Port`, `AnyPort`, `PortType`, `PortSubscription`). This is plumbing that `armature_flutter` and custom `Renderer` implementations need; **application code should not import it** — typed APIs (`Pipe`, `Behavior`, slot widgets) cover every end-user scenario.
+
+Day-to-day feature / store code only needs `armature.dart`.
 
 ## Learn more
 

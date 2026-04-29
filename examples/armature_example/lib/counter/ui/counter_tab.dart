@@ -154,36 +154,32 @@ class _FlakyFetchButtonState extends State<_FlakyFetchButton> {
 
   @override
   Widget build(BuildContext context) {
-    return StateObserver(
-      builder: (_) {
-        final state = widget.store.flakyFetch.state;
-        return switch (state) {
-          TaskIdle() => OutlinedButton.icon(
-            onPressed: () => widget.store.flakyFetch(),
-            icon: const Icon(Icons.cloud_download_outlined),
-            label: const Text('Fetch greeting (50% fail, autoReset 3s)'),
-          ),
-          TaskPending() => OutlinedButton.icon(
-            onPressed: null,
-            icon: const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            label: const Text('Fetching…'),
-          ),
-          TaskDone(:final result) => OutlinedButton.icon(
-            onPressed: null,
-            icon: const Icon(Icons.check_circle, color: Colors.green),
-            label: Text('OK: $result'),
-          ),
-          TaskFailed(:final error) => OutlinedButton.icon(
-            onPressed: null,
-            icon: const Icon(Icons.error_outline, color: Colors.red),
-            label: Text('Failed: $error'),
-          ),
-        };
-      },
+    return TaskBuilder(
+      task: widget.store.flakyFetch,
+      idle: (_) => OutlinedButton.icon(
+        onPressed: () => widget.store.flakyFetch(),
+        icon: const Icon(Icons.cloud_download_outlined),
+        label: const Text('Fetch greeting (50% fail, autoReset 3s)'),
+      ),
+      pending: (_, _) => OutlinedButton.icon(
+        onPressed: null,
+        icon: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        label: const Text('Fetching…'),
+      ),
+      done: (_, result) => OutlinedButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.check_circle, color: Colors.green),
+        label: Text('OK: $result'),
+      ),
+      failed: (_, FetchError error) => OutlinedButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.error_outline, color: Colors.red),
+        label: Text('Failed: $error'),
+      ),
     );
   }
 }

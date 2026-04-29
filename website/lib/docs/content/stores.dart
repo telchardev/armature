@@ -64,6 +64,63 @@ class StoresContent extends StatelessWidget {
           'the same value are skipped:',
         ),
         const CodeBlock(code: _writeSource, language: 'dart'),
+        const DocHeading('Imperative subscriptions'),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Outside reactive scopes, listen to a store with ',
+              ),
+              inlineCode('subscribe', context),
+              const TextSpan(text: ' for the raw whole-state signal, or '),
+              inlineCode('subscribeSelect', context),
+              const TextSpan(
+                text:
+                    ' for an equality-filtered projection. Both return a '
+                    'disposer; both are silent no-ops after dispose.',
+              ),
+            ],
+          ),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        ),
+        const SizedBox(height: 16),
+        const CodeBlock(code: _subscribeSource, language: 'dart'),
+        const DocParagraph(
+          'subscribeSelect compares projections with == by default. For '
+          'collection-typed selectors pass equals (e.g. listEquals from '
+          'flutter/foundation) so the listener fires only on content '
+          'changes:',
+        ),
+        const CodeBlock(code: _subscribeSelectEqualsSource, language: 'dart'),
+        const DocHeading('Side effects from widgets'),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text:
+                    'StateObserver / StoreBuilder rebuild on changes. For '
+                    'fire-and-forget side effects (navigation, snackbars, '
+                    'analytics) without rebuilding, wrap the subtree in ',
+              ),
+              inlineCode('StoreListener', context),
+              const TextSpan(
+                text:
+                    ' — it subscribes for the lifetime of the widget and '
+                    'fires the callback only on transitions that pass the '
+                    'optional listenWhen filter:',
+              ),
+            ],
+          ),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        ),
+        const SizedBox(height: 16),
+        const CodeBlock(code: _storeListenerSource, language: 'dart'),
+        const DocParagraph(
+          'The state generic is inferred from the Store argument — no '
+          'second type parameter to spell out. listener receives the '
+          'current BuildContext, so it can call Navigator, '
+          'ScaffoldMessenger, or anything else that needs the tree.',
+        ),
         const DocHeading('Tasks'),
         const DocParagraph(
           'Tasks wrap async work with an observable state machine: '
@@ -197,3 +254,36 @@ late final search = createTask<String, List<Note>, Exception>(
   fn: (query) => searchEngine.find(query),
   strategy: TaskStrategy.latest,
 );''';
+
+const _subscribeSource = '''// Whole-state side effect.
+final cancel = userStore.subscribe((prev, next) {
+  print('user changed: \${prev.id} -> \${next.id}');
+});
+
+// Equality-filtered projection. Fires only when user.id moves.
+final cancelId = userStore.subscribeSelect(
+  (s) => s.user?.id,
+  (prev, next) => analytics.identify(next),
+);
+
+// ... later ...
+cancel();
+cancelId();''';
+
+const _subscribeSelectEqualsSource =
+    '''import 'package:flutter/foundation.dart' show listEquals;
+
+notesStore.subscribeSelect(
+  (s) => s.items,
+  (_, next) => sync(next),
+  equals: listEquals,
+);''';
+
+const _storeListenerSource = '''StoreListener(
+  store: context.store<AuthStore>(),
+  // Optional edge filter — fires only when the predicate flips true.
+  listenWhen: (prev, next) => !prev.isLoggedIn && next.isLoggedIn,
+  listener: (ctx, _) =>
+      Navigator.of(ctx).pushReplacementNamed('/home'),
+  child: const LoginForm(),
+)''';

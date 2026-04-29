@@ -75,14 +75,9 @@ class _GraphTabState extends State<GraphTab>
     super.dispose();
   }
 
-  /// Re-reads the container snapshot and re-runs layout.
-  /// `extractGraphData` + `layoutNodes` are one-shot on first build by
-  /// design (stable positions for drag), so live status flips don't
-  /// repaint automatically. Refresh picks up newly-added features and
-  /// current statuses; selection and **any user-dragged node
-  /// positions** are preserved when the node still exists in the new
-  /// snapshot. New features fall back to the fresh layout-computed
-  /// position.
+  /// Re-reads the container snapshot and re-runs layout. User-dragged
+  /// node positions and the current selection are preserved when the
+  /// node still exists in the new snapshot.
   void _refresh() {
     setState(() {
       final previousPositions = <String, Offset>{

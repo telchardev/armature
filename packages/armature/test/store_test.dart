@@ -19,6 +19,16 @@ class TaskResult {
   const TaskResult(this.receivedAmount);
 }
 
+/// Tiny store used by the `subscribeSelect` content-equality test. Keeps
+/// a `List<int>` and exposes a setter that replaces the underlying
+/// list reference on every call — verifies that without a content-
+/// aware `equals`, identity-based `==` would fire on each write.
+class _ItemsStore extends Store<List<int>> {
+  _ItemsStore({required List<int> items}) : super(state: items);
+
+  void replaceItems(List<int> next) => state = List<int>.of(next);
+}
+
 class TestStore extends Store<TestState> {
   final List<String> queueEvents = [];
 
@@ -524,5 +534,154 @@ void main() {
         expect(caught, isA<TaskError>());
       },
     );
+  });
+
+  group('Store.subscribeSelect', () {
+    test('listener fires only when the selected projection changes', () {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+      final seen = <(int, int)>[];
+
+      store.subscribeSelect<int>(
+        (s) => s.id,
+        (prev, next) => seen.add((prev, next)),
+      );
+
+      store.setState(const (id: 0));
+      expect(seen, isEmpty);
+
+      store.setState(const (id: 1));
+      expect(seen, equals([(0, 1)]));
+
+      store.setState(const (id: 1));
+      expect(seen, equals([(0, 1)]));
+
+      store.setState(const (id: 2));
+      expect(seen, equals([(0, 1), (1, 2)]));
+    });
+
+    test('fireImmediately seeds the listener with (current, current)', () {
+      final store = TestStore(state: const (id: 5));
+      addTearDown(store.dispose);
+      final seen = <(int, int)>[];
+
+      store.subscribeSelect<int>(
+        (s) => s.id,
+        (prev, next) => seen.add((prev, next)),
+        fireImmediately: true,
+      );
+      expect(seen, equals([(5, 5)]));
+    });
+
+    test('returned disposer detaches the listener', () {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+      final seen = <int>[];
+
+      final dispose = store.subscribeSelect<int>(
+        (s) => s.id,
+        (_, next) => seen.add(next),
+      );
+      store.setState(const (id: 1));
+      dispose();
+      store.setState(const (id: 2));
+      expect(seen, equals([1]));
+    });
+
+    test('custom equals filters projection by content (e.g. listEquals)', () {
+      // List<int> projection — `==` is identity, so without a custom
+      // equals the listener would fire on every state write that
+      // produces a fresh list, even with the same contents.
+      bool listEquals(List<int> a, List<int> b) {
+        if (a.length != b.length) return false;
+        for (var i = 0; i < a.length; i++) {
+          if (a[i] != b[i]) return false;
+        }
+        return true;
+      }
+
+      final store = _ItemsStore(items: const [1, 2]);
+      addTearDown(store.dispose);
+      final seen = <List<int>>[];
+
+      store.subscribeSelect<List<int>>(
+        (s) => s,
+        (_, next) => seen.add(List.of(next)),
+        equals: listEquals,
+      );
+
+      // Same content, fresh list — must NOT fire.
+      store.replaceItems(const [1, 2]);
+      expect(seen, isEmpty);
+
+      // Different content — fires once.
+      store.replaceItems(const [1, 2, 3]);
+      expect(
+        seen,
+        equals([
+          [1, 2, 3],
+        ]),
+      );
+    });
+  });
+
+  group('Task.firstWhere / awaitDone / awaitFailed / awaitSettled', () {
+    test(
+      'firstWhere resolves immediately when state already matches',
+      () async {
+        final store = TestStore(state: const (id: 0));
+        addTearDown(store.dispose);
+
+        await store.onceSuccessTask(const TaskParams(7));
+        final settled = await store.onceSuccessTask.firstWhere(
+          (s) => s is TaskDone<TaskParams, TaskResult, Object?>,
+        );
+        expect(settled, isA<TaskDone<TaskParams, TaskResult, Object?>>());
+      },
+    );
+
+    test('firstWhere awaits a future transition', () async {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+
+      final donePromise = store.onceCountedTask.firstWhere(
+        (s) => s is TaskDone<int, int, Object>,
+      );
+
+      final result = await store.onceCountedTask(3);
+      expect(result, 6);
+      expect(await donePromise, isA<TaskDone<int, int, Object>>());
+    });
+
+    test('awaitDone yields the result payload', () async {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+
+      final futureResult = store.onceCountedTask.awaitDone();
+      await store.onceCountedTask(4);
+      expect(await futureResult, 8);
+    });
+
+    test('awaitFailed yields the typed error payload', () async {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+
+      final futureError = store.onceSharedFailingTask.awaitFailed();
+      try {
+        await store.onceSharedFailingTask(1);
+      } on Object {
+        // expected — task fn throws on every call
+      }
+      expect(await futureError, isA<StateError>());
+    });
+
+    test('awaitSettled yields whichever terminal state lands first', () async {
+      final store = TestStore(state: const (id: 0));
+      addTearDown(store.dispose);
+
+      final settledOk = store.onceCountedTask.awaitSettled();
+      await store.onceCountedTask(2);
+      expect(await settledOk, isA<TaskDone<int, int, Object>>());
+    });
   });
 }

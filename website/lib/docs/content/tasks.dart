@@ -191,6 +191,62 @@ class TasksContent extends StatelessWidget {
           'arrives mid-window.',
         ),
         const CodeBlock(code: _resetSource, language: 'dart'),
+        const DocHeading('Pattern matching helpers'),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text:
+                    'For ergonomic branching without a full sealed switch, '
+                    'use the ',
+              ),
+              inlineCode('TaskStateExtensions', context),
+              const TextSpan(
+                text:
+                    ' that ship with armature: .when (exhaustive, '
+                    'compile-checked) and .maybeWhen (partial with orElse). '
+                    'Boolean and nullable getters give one-line access to a '
+                    'specific branch.',
+              ),
+            ],
+          ),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        ),
+        const SizedBox(height: 16),
+        const CodeBlock(code: _whenSource, language: 'dart'),
+        const DocHeading('TaskBuilder widget'),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(text: 'For Flutter, '),
+              inlineCode('TaskBuilder', context),
+              const TextSpan(
+                text:
+                    ' wraps the same .when matching in a reactive widget. '
+                    'All four branches are required, generics infer from '
+                    'the task argument, and rebuilds happen on every state '
+                    'transition:',
+              ),
+            ],
+          ),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+        ),
+        const SizedBox(height: 16),
+        const CodeBlock(code: _taskBuilderSource, language: 'dart'),
+        const DocParagraph(
+          'Use TaskBuilder when the four-way switch is the whole UI; drop '
+          'down to StateObserver when you need to read store state '
+          'alongside the task or compose with other reactive sources.',
+        ),
+        const DocHeading('Awaiting transitions'),
+        const DocParagraph(
+          'Outside reactive scopes (tests, orchestration scripts), wait '
+          'for a specific transition with firstWhere / awaitDone / '
+          'awaitFailed / awaitSettled. Each returns a Future that '
+          'auto-detaches its subscription as soon as the predicate '
+          'matches.',
+        ),
+        const CodeBlock(code: _awaitSource, language: 'dart'),
         const DocHeading('Disposal'),
         const DocParagraph(
           'Tasks do not need manual cleanup. Store.dispose cascades to '
@@ -319,3 +375,49 @@ StateObserver(
     _ => const SizedBox.shrink(),
   },
 )''';
+
+const _whenSource = '''// Exhaustive — compiler enforces every branch.
+final widget = task.state.when(
+  idle:    ()         => const _Placeholder(),
+  pending: (params)   => CircularProgressIndicator.adaptive(),
+  done:    (result)   => ResultCard(result),
+  failed:  (error)    => ErrorBanner(message: error.toString()),
+);
+
+// Partial — only some branches matter.
+final label = task.state.maybeWhen<String>(
+  done: (r) => 'Loaded \$r items',
+  orElse: (_) => 'Loading…',
+);
+
+// One-liners.
+if (task.state.isPending) showSpinner();
+final result = task.state.resultOrNull;          // null unless TaskDone
+final params = task.state.paramsOrNull;          // null unless TaskPending
+final error  = task.state.errorOrNull;           // null unless TaskFailed''';
+
+const _taskBuilderSource = '''// store.fetchUser: Task<int, User, ApiException>
+TaskBuilder(
+  task: store.fetchUser,
+  idle:    (_)         => const _Placeholder(),
+  pending: (_, userId) => const CircularProgressIndicator.adaptive(),
+  done:    (_, user)   => UserCard(user),
+  failed:  (_, e)      => ErrorBanner(message: e.message),
+)''';
+
+const _awaitSource = '''// In a test:
+final f = store.fetchUser(42);
+expect(store.fetchUser.state, isA<TaskPending<int, User, ApiException>>());
+final user = await store.fetchUser.awaitDone();
+expect(user.id, 42);
+expect(await f, user);
+
+// Orchestration: wait for any terminal state.
+final settled = await store.persist.awaitSettled();
+print(settled is TaskDone ? 'saved' : 'failed');
+
+// Custom predicate.
+await store.search.firstWhere(
+  (s) => s is TaskDone<String, List<Note>, Exception>
+      && (s as TaskDone).result.isNotEmpty,
+);''';

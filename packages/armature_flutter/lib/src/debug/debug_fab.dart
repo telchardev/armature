@@ -34,8 +34,8 @@ class DebugFab extends StatelessWidget {
                         decoration: TextDecoration.none,
                       ),
                     )
-                  : CustomPaint(
-                      size: const Size(20, 20),
+                  : const CustomPaint(
+                      size: Size(20, 20),
                       painter: _GraphIconPainter(),
                     ),
             ),
@@ -81,6 +81,8 @@ class RefreshFab extends StatelessWidget {
 }
 
 class _GraphIconPainter extends CustomPainter {
+  const _GraphIconPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;

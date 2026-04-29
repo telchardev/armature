@@ -91,6 +91,14 @@ final class FeatureConfig<
   final Set<AnyPort> ports = {};
   final List<PortBinding> portBindings = [];
 
+  List<AnyPort>? _portsSnapshot;
+
+  /// Stable unmodifiable view of [ports]. Cached on first read; safe
+  /// because [ports] is frozen after the feature's construction
+  /// cascade. Used by hot iteration paths (e.g. status-change fanout).
+  List<AnyPort> get portsSnapshot =>
+      _portsSnapshot ??= List<AnyPort>.unmodifiable(ports);
+
   StoresFactory<TStores>? storesFactory;
   final ExportsFactory<TStores, TExports>? exportsFactory;
 

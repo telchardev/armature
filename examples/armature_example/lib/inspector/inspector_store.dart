@@ -13,4 +13,10 @@ class InspectorStore extends Store<InspectorState> {
       );
     },
   );
+
+  late final clear = createVoidTask(
+    fn: () async {
+      state = (lastRefresh: null, refreshCount: 0);
+    },
+  );
 }

@@ -1,5 +1,6 @@
-import 'package:armature/advanced.dart' show PipeHandler, PortSubscription;
+import 'package:armature/advanced.dart' show PipeHandler;
 import 'package:armature/armature.dart' show Pipe;
+import 'package:armature/framework.dart' show PortSubscription;
 import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, State;
 
@@ -60,8 +61,7 @@ class _PipeProviderState<TValue extends Object>
     if (widget.pipe != oldWidget.pipe) {
       resubscribe();
     } else if (widget.initialValue != oldWidget.initialValue) {
-      // Same pipe, new seed — reapply reuses the Reaction, diffing
-      // atom deps instead of re-allocating the subscription.
+      // Same pipe, new seed — reuse the existing subscription.
       subscription?.reapply(initialValue: widget.initialValue, data: null);
     }
   }

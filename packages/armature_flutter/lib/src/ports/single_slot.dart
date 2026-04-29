@@ -1,6 +1,6 @@
-import 'package:armature/advanced.dart' show Port, PortType;
 import 'package:armature/armature.dart'
     show AppContainer, Feature, FeatureHandlerContext, FeatureStatus;
+import 'package:armature/framework.dart' show Port, PortType;
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:meta/meta.dart' show internal;
 

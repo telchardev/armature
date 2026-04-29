@@ -1,5 +1,6 @@
-import 'package:armature/advanced.dart' show BehaviorHandler, PortSubscription;
+import 'package:armature/advanced.dart' show BehaviorHandler;
 import 'package:armature/armature.dart' show Behavior, BehaviorDescriptor;
+import 'package:armature/framework.dart' show PortSubscription;
 import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, State;
 

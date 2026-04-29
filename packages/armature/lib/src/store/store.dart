@@ -9,30 +9,15 @@ import './task.dart'
     show Task, TaskStrategy, TaskFn, VoidTask, create, createVoid;
 
 /// Framework-internal aggregate thrown by [Store.dispose] when
-/// **multiple** owned [Task]s threw during teardown.
-///
-/// Task disposal errors are isolated — every owned task is given a
-/// chance to dispose regardless of what its siblings did. After the
-/// dispose pass:
-///
-///   * 0 errors → [Store.dispose] returns normally.
-///   * 1 error → that error is rethrown with its original stack trace
-///     (callers `catch`-ing a specific exception type still match).
-///   * ≥ 2 errors → all of them are surfaced together via this class.
-///
-/// Not exported through the public barrel — when these reach
-/// `FeatureRuntime.teardown` they are repackaged into a `HandlerError`
-/// (its `toString()` carries the diagnostic). The class stays
-/// `@internal` so application code doesn't depend on the concrete
-/// type. If you need structured access in your own tests, import
-/// `package:armature/src/store/store.dart` directly.
+/// **multiple** owned [Task]s threw during teardown. A single task
+/// dispose error is rethrown as-is with its original stack trace;
+/// this aggregate only appears for two or more captured errors.
 @internal
 class TaskDisposeErrors implements Exception {
-  /// Captured throws, in the order their tasks were disposed. Each
-  /// entry pairs the original exception with its stack trace.
+  /// Captured throws, in dispose order. Each entry pairs the thrown
+  /// object with its stack trace.
   final List<({Object error, StackTrace stackTrace})> errors;
 
-  /// Wraps [errors] in an unmodifiable view.
   TaskDisposeErrors(List<({Object error, StackTrace stackTrace})> errors)
     : errors = List.unmodifiable(errors);
 
@@ -221,28 +206,15 @@ abstract class Store<TState extends Object?> {
     return task;
   }
 
-  /// Tears down the store: disposes its [State] (detaches every
-  /// subscriber and the reactive atom), disposes every owned [Task]
-  /// (rejecting in-flight calls with [TaskError]), and clears the
-  /// internal task list.
+  /// Tears down the store: disposes its [State], disposes every owned
+  /// [Task] (rejecting in-flight calls with [TaskError]), and clears
+  /// the internal task list. Idempotent. Subclasses that override
+  /// must invoke `super.dispose()` (`@mustCallSuper`).
   ///
-  /// Idempotent — calling [dispose] twice is safe (underlying
-  /// components re-enter their own `_disposed` short-circuits).
-  /// Subclasses that need custom teardown should override this
-  /// method and invoke `super.dispose()` (`@mustCallSuper`).
-  ///
-  /// Error isolation: each owned [Task]'s `dispose()` call is wrapped
-  /// in a try/catch — a single misbehaving task never prevents its
-  /// siblings from being torn down. After every task has had a chance
-  /// to dispose:
-  ///
-  ///   * 0 captured errors → return normally.
-  ///   * 1 captured error → rethrow with its original stack trace
-  ///     (callers `catch`-ing a specific exception type still match).
-  ///   * ≥ 2 captured errors → throw [TaskDisposeErrors] with the full
-  ///     list so `FeatureRuntime.teardown` (and other callers up the
-  ///     chain) can route every failure through the container's error
-  ///     handler.
+  /// Each owned task's `dispose()` is wrapped in try/catch so one
+  /// misbehaving task never prevents siblings from being torn down.
+  /// After the pass: 0 errors → return; 1 → rethrow with the
+  /// original stack trace; ≥ 2 → throw [TaskDisposeErrors].
   @mustCallSuper
   void dispose() {
     _internalState.dispose();
@@ -293,4 +265,55 @@ abstract class Store<TState extends Object?> {
   void update(StateUpdateCallback<TState> callback) {
     _internalState.update(callback);
   }
+
+  /// Subscribes [listener] to a derived projection of [state]; fires
+  /// only when the selected value changes by `==` (or by [equals] if
+  /// supplied). Use [subscribe] for the raw whole-state signal; use
+  /// this when you want a field, record, or view-model.
+  ///
+  /// ```dart
+  /// final unsubscribe = userStore.subscribeSelect(
+  ///   (state) => state.user?.id,
+  ///   (prev, next) => analytics.identify(next),
+  /// );
+  /// ```
+  ///
+  /// Pass [equals] for content-based equality on collections (`List`,
+  /// `Map`, `Set`) — e.g. `listEquals` from `flutter/foundation`:
+  ///
+  /// ```dart
+  /// store.subscribeSelect(
+  ///   (s) => s.items,
+  ///   (_, next) => onItemsChanged(next),
+  ///   equals: listEquals,
+  /// );
+  /// ```
+  ///
+  /// When [fireImmediately] is `true` the listener fires once with
+  /// `(currentSelection, currentSelection)`. Returns a disposer;
+  /// silent no-op after [dispose].
+  StateListenerDisposer subscribeSelect<R>(
+    R Function(TState state) selector,
+    void Function(R prev, R next) listener, {
+    bool Function(R a, R b)? equals,
+    bool fireImmediately = false,
+  }) {
+    final eq = equals ?? _defaultEquals<R>;
+    var lastSelection = selector(state);
+    if (fireImmediately) {
+      listener(lastSelection, lastSelection);
+    }
+    return subscribe((_, next) {
+      final nextSelection = selector(next);
+      if (eq(lastSelection, nextSelection)) return;
+      final prevSelection = lastSelection;
+      lastSelection = nextSelection;
+      listener(prevSelection, nextSelection);
+    });
+  }
 }
+
+/// Default equality used by [Store.subscribeSelect] when the caller
+/// doesn't pass a custom comparator. Hoisted to a top-level function
+/// so we don't allocate a fresh closure per call.
+bool _defaultEquals<R>(R a, R b) => a == b;

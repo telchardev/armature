@@ -104,11 +104,8 @@ class _StoreSelectorState<V> extends State<StoreSelector<V>>
     });
 
     if (_hasValue && _lastValue == value) {
-      // Inherited-widget dependents deeper in the subtree are tracked
-      // on their own Elements by Flutter and still rebuild when their
-      // deps change; returning the cached instance here just skips the
-      // selector's own subtree diff — exactly the perf win we're
-      // after.
+      // Cached widget skips the selector's subtree diff. Inherited-
+      // widget deps deeper down still rebuild via their own Elements.
       return _lastChild!;
     }
     _hasValue = true;

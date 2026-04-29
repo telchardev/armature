@@ -73,20 +73,8 @@ ActivationSetup whenStoreState<TExports, TState>({
 ///
 /// The [feature] must appear in the caller's `dependsOn` or
 /// `optionalDependsOn` list.
-ActivationSetup whenActive(AnyFeature feature) {
-  return (parentApi, toggle, cleanup) {
-    final statusStore = parentApi.statusOf(feature);
-    cleanup.subscribe(statusStore, (_, status) {
-      unawaited(
-        toggle(
-          status == FeatureStatus.active
-              ? ToggleState.active
-              : ToggleState.inactive,
-        ),
-      );
-    }, fireImmediately: true);
-  };
-}
+ActivationSetup whenActive(AnyFeature feature) =>
+    _whenStatus(feature, (status) => status == FeatureStatus.active);
 
 /// Inverse of [whenActive] — the owning feature is active while
 /// [feature] is **not** `FeatureStatus.active` (i.e. `.disabled` or
@@ -99,15 +87,25 @@ ActivationSetup whenActive(AnyFeature feature) {
 ///   optionalDependsOn: [sessionFeature],
 /// )..activation(whenInactive(sessionFeature));
 /// ```
-ActivationSetup whenInactive(AnyFeature feature) {
+ActivationSetup whenInactive(AnyFeature feature) =>
+    _whenStatus(feature, (status) => status != FeatureStatus.active);
+
+/// Shared body for [whenActive] / [whenInactive] — subscribes to
+/// [feature]'s status store and toggles the owning feature based on
+/// [shouldBeActive] applied to each emitted status. The two helpers
+/// only differ in the predicate, so factoring it out keeps the
+/// activation flow (subscribe + fireImmediately + cleanup) in one
+/// place.
+ActivationSetup _whenStatus(
+  AnyFeature feature,
+  bool Function(FeatureStatus status) shouldBeActive,
+) {
   return (parentApi, toggle, cleanup) {
     final statusStore = parentApi.statusOf(feature);
     cleanup.subscribe(statusStore, (_, status) {
       unawaited(
         toggle(
-          status != FeatureStatus.active
-              ? ToggleState.active
-              : ToggleState.inactive,
+          shouldBeActive(status) ? ToggleState.active : ToggleState.inactive,
         ),
       );
     }, fireImmediately: true);

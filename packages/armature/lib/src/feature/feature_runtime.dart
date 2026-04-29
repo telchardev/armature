@@ -18,14 +18,13 @@ import './feature_api.dart'
 import './feature_status.dart' show FeatureStatus, FeatureToggle;
 
 /// Private [Store] subclass whose state mirrors the container's
-/// per-feature [FeatureStatus]. Exposes a file-local [set] setter so
-/// the framework can write transitions; user code receives a plain
+/// per-feature [FeatureStatus]. Exposes a file-local [setStatus] mutator
+/// so the framework can write transitions; user code receives a plain
 /// `Store<FeatureStatus>` reference.
 class _FeatureStatusStore extends Store<FeatureStatus> {
   _FeatureStatusStore() : super(state: FeatureStatus.disabled);
 
-  // ignore: use_setters_to_change_properties — framework-only mutator.
-  void set(FeatureStatus next) {
+  void setStatus(FeatureStatus next) {
     state = next;
   }
 }
@@ -115,24 +114,16 @@ final class FeatureRuntime<TStores extends Object?, TExports extends Object?> {
   /// for this container.
   Store<FeatureStatus> get statusStore => _statusStore;
 
-  /// Public exports record for this feature — what [FeatureParentApi.of]
-  /// returns to descendants. Computed lazily on first external access
-  /// via the feature's typed `applyExportsFactory` (which holds the
-  /// concrete `TStores` / `TExports`), memoised for this runtime's
-  /// lifetime.
+  /// Public exports record returned to descendants by
+  /// [FeatureParentApi.of]. Computed lazily once per cycle through
+  /// the feature's typed `applyExportsFactory` (which preserves the
+  /// concrete `TStores` / `TExports` generics), memoised for the
+  /// lifetime of this runtime.
   TExports get exports {
-    if (!_exportsComputed) {
-      // Dispatch through Feature.applyExportsFactory so the stored
-      // ExportsFactory is called under the feature's own generics,
-      // sidestepping the Object?-erasure contravariance issue we'd
-      // hit reading `config.exportsFactory` directly from here.
-      final applied = feature.applyExportsFactory(scopeApi);
-      // `applied == null` either because factory was null (stateless
-      // feature) or because the factory returned null. Either way
-      // cache it; downstream `exports` will surface the null.
-      _exportsCached = applied as TExports?;
-      _exportsComputed = true;
-    }
+    if (_exportsComputed) return _exportsCached as TExports;
+    final applied = feature.applyExportsFactory(scopeApi);
+    _exportsCached = applied as TExports?;
+    _exportsComputed = true;
     return _exportsCached as TExports;
   }
 
@@ -141,7 +132,7 @@ final class FeatureRuntime<TStores extends Object?, TExports extends Object?> {
   /// Framework mutator for [statusStore]. Called by the orchestrator
   /// after every committed graph transition.
   void updateStatusStore(FeatureStatus next) {
-    _statusStore.set(next);
+    _statusStore.setStatus(next);
   }
 
   /// Eager construct phase: delegates to [Feature.buildScopeApi],

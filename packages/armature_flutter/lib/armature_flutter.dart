@@ -10,7 +10,7 @@ export './src/armature_app.dart' show ArmatureApp;
 export './src/bootstrap.dart' show bootstrap;
 export './src/contexts/container_context.dart' show ContainerContext;
 export './src/contexts/store_context.dart'
-    show BuildContextStoreExt, StoreContext;
+    show BuildContextStoreExtensions, StoreContext;
 export './src/create_feature_root.dart'
     show FeatureRootBuilder, createFeatureRoot;
 export './src/debug/feature_graph_overlay.dart' show FeatureGraphOverlay;
@@ -40,4 +40,13 @@ export './src/renderer/flutter_renderer.dart'
 export './src/renderer/renderer.dart' show Renderer, RenderRootResult;
 export './src/stores/state_observer.dart' show StateObserver;
 export './src/stores/store_builder.dart' show StoreBuilder;
+export './src/stores/store_listener.dart'
+    show StoreListenCallback, StoreListenWhen, StoreListener;
 export './src/stores/store_selector.dart' show StoreSelector;
+export './src/stores/task_builder.dart'
+    show
+        TaskBuilder,
+        TaskDoneBuilder,
+        TaskFailedBuilder,
+        TaskIdleBuilder,
+        TaskPendingBuilder;

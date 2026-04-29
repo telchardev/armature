@@ -99,7 +99,7 @@ class FeatureDependency {
 /// built — i.e. before the first successful `start()`, after a rolled-
 /// back start, or after [AppContainer.stop] (the graph is dropped on
 /// every teardown).
-extension ContainerDebugExt on AppContainer {
+extension ContainerDebugExtensions on AppContainer {
   ContainerDebug get debug {
     final g = graph;
     final nodeByValue = <AnyFeature, GraphNode<AnyFeature>>{};

@@ -38,9 +38,7 @@ class _MinimapState extends State<Minimap> {
   void didUpdateWidget(Minimap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      // Controller reference swapped under us: detach from the old
-      // one (or we'd leak the listener) and attach to the new one so
-      // pan/zoom updates still drive repaints.
+      // Swap listener from old controller to new one.
       oldWidget.controller.removeListener(_onTransformChanged);
       widget.controller.addListener(_onTransformChanged);
     }
@@ -173,9 +171,7 @@ class _MinimapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MinimapPainter old) {
-    // Same reasoning as GraphPainter: node fields mutate in place, so
-    // identity-based checks miss status flips and drag updates. This
-    // is debug UI — always repaint.
+    // Node fields mutate in place; always repaint (debug overlay).
     return true;
   }
 }

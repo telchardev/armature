@@ -1,7 +1,11 @@
 import 'dart:ui' show Offset;
 
 import 'package:armature/advanced.dart'
-    show ContainerDebugExt, FeatureDebugInfo, FeatureDependency, PortDebugInfo;
+    show
+        ContainerDebugExtensions,
+        FeatureDebugInfo,
+        FeatureDependency,
+        PortDebugInfo;
 import 'package:armature/armature.dart' show AppContainer, FeatureStatus, Store;
 import 'package:meta/meta.dart' show internal;
 

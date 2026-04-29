@@ -112,9 +112,8 @@ enum ThrottleEdge {
   trailing,
 }
 
-/// Atomic snapshot of a [Task]'s lifecycle. Replaces the previous trio
-/// of independent `pending` / `done` / `fail` states — observers now
-/// see a single value that transitions through the cases below.
+/// Atomic snapshot of a [Task]'s lifecycle. Observers see a single
+/// value that transitions through the cases below.
 ///
 /// **Transition rules:**
 ///   * Initial value is [TaskIdle].
@@ -265,6 +264,61 @@ class Task<TParams, TResult, TError> {
     StateChangeListener<TaskState<TParams, TResult, TError>> listener, {
     bool fireImmediately = false,
   }) => _state.subscribe(listener, fireImmediately: fireImmediately);
+
+  /// Resolves with the next [TaskState] for which [predicate] returns
+  /// `true`. The current value is checked first — if it already
+  /// matches, the returned future settles synchronously on the next
+  /// microtask without subscribing.
+  ///
+  /// Mostly useful in tests and orchestration code that wants to
+  /// `await` a specific transition without writing the
+  /// subscribe/Completer/disposer ceremony each time. The subscription
+  /// is auto-detached as soon as the predicate matches, so memory
+  /// leaks are not possible.
+  ///
+  /// Throws [TaskError] if the task is disposed before the predicate
+  /// matches.
+  Future<TaskState<TParams, TResult, TError>> firstWhere(
+    bool Function(TaskState<TParams, TResult, TError> state) predicate,
+  ) {
+    final current = state;
+    if (predicate(current)) return Future.value(current);
+    final completer = Completer<TaskState<TParams, TResult, TError>>();
+    late StateListenerDisposer disposer;
+    disposer = subscribe((_, next) {
+      if (!predicate(next)) return;
+      disposer();
+      if (!completer.isCompleted) completer.complete(next);
+    });
+    return completer.future;
+  }
+
+  /// Sugar for `firstWhere((s) => s is TaskDone<...>)`. Resolves with
+  /// the [TaskDone] payload (typed `TResult`).
+  Future<TResult> awaitDone() async {
+    final settled = await firstWhere(
+      (s) => s is TaskDone<TParams, TResult, TError>,
+    );
+    return (settled as TaskDone<TParams, TResult, TError>).result;
+  }
+
+  /// Sugar for `firstWhere((s) => s is TaskFailed<...>)`. Resolves
+  /// with the sticky [TError] payload.
+  Future<TError> awaitFailed() async {
+    final settled = await firstWhere(
+      (s) => s is TaskFailed<TParams, TResult, TError>,
+    );
+    return (settled as TaskFailed<TParams, TResult, TError>).error;
+  }
+
+  /// Resolves on the next sticky settlement — either [TaskDone] or
+  /// [TaskFailed]. Useful when you want to await any terminal state
+  /// without caring which side won.
+  Future<TaskState<TParams, TResult, TError>> awaitSettled() => firstWhere(
+    (s) =>
+        s is TaskDone<TParams, TResult, TError> ||
+        s is TaskFailed<TParams, TResult, TError>,
+  );
 
   final Queue<Future<TResult>> _callQueue = Queue();
 
@@ -512,9 +566,26 @@ class Task<TParams, TResult, TError> {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    final pending = List<Completer<TResult>>.from(_latestPending);
-    _latestPending.clear();
-    for (final c in pending) {
+    final count = _latestPending.length;
+    if (count == 0) return;
+
+    if (count == 1) {
+      final c = _latestPending.first;
+      _latestPending.clear();
+      if (c.isCompleted) return;
+      if (error != null) {
+        c.completeError(error, stackTrace);
+      } else {
+        c.complete(result as TResult);
+      }
+      return;
+    }
+
+    // [Completer.complete] / [Completer.completeError] schedule
+    // `then` callbacks in a microtask, so they can't synchronously
+    // re-enter `_latestPending` during this loop — direct iteration
+    // is safe without a defensive snapshot.
+    for (final c in _latestPending) {
       if (c.isCompleted) continue;
       if (error != null) {
         c.completeError(error, stackTrace);
@@ -522,6 +593,7 @@ class Task<TParams, TResult, TError> {
         c.complete(result as TResult);
       }
     }
+    _latestPending.clear();
   }
 
   Future<TResult> _callDebounce(TParams params, Duration duration) {
@@ -585,12 +657,13 @@ class Task<TParams, TResult, TError> {
       return existing;
     }
 
+    final myGen = _generation;
     final fut = _executeFn(params);
     _throttleLastFuture = fut;
 
     fut.then<void>((_) {}, onError: (Object _, StackTrace _) {}).whenComplete(
       () {
-        if (_disposed) return;
+        if (_disposed || myGen != _generation) return;
         _throttleCooldown = Timer(duration, () {
           _throttleCooldown = null;
           _throttleLastFuture = null;

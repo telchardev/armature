@@ -77,7 +77,7 @@ class SlotWidget<TInputData, TSlotDescriptor extends SlotDescriptor>
 class _SlotWidgetState<TInputData, TSlotDescriptor extends SlotDescriptor>
     extends State<SlotWidget<TInputData, TSlotDescriptor>>
     with SafeSetStateMixin {
-  void Function()? _disposer;
+  late final void Function() _disposer;
 
   @override
   void initState() {
@@ -91,10 +91,8 @@ class _SlotWidgetState<TInputData, TSlotDescriptor extends SlotDescriptor>
   Widget _renderError(Object error, StackTrace stackTrace) {
     final featureName = widget.feature.name;
 
-    // RenderError.wrap passes already-typed framework errors through
-    // unchanged; raw throws become `RenderError` so subscribers of
-    // `errorHandler` can filter render failures from handler / listener
-    // failures.
+    // Wrap as RenderError so errorHandler can distinguish render
+    // failures from handler / listener ones.
     widget.container.reportError(
       feature: widget.feature,
       error: RenderError.wrap(featureName, error, stackTrace: stackTrace),
@@ -113,7 +111,7 @@ class _SlotWidgetState<TInputData, TSlotDescriptor extends SlotDescriptor>
 
   @override
   void dispose() {
-    _disposer?.call();
+    _disposer();
     super.dispose();
   }
 

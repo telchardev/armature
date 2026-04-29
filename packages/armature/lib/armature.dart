@@ -60,3 +60,4 @@ export 'src/store/task.dart'
         TaskState,
         TaskStrategy,
         ThrottleEdge;
+export 'src/store/task_state_extensions.dart' show TaskStateExtensions;

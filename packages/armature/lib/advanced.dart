@@ -6,8 +6,6 @@
 ///   ([BehaviorHandler], [PipeHandler], [TaskFn], [VoidTask],
 ///   [StateChangeListener], [StateListenerDisposer],
 ///   [StateUpdateCallback]);
-/// * port base types for generic code ([AnyPort], [Port], [PortType],
-///   [PortSubscription]);
 /// * the individual `TaskStrategy*` classes (usually you reach for
 ///   factories on [TaskStrategy] — `.queue`, `.once`, `.debounce(...)`
 ///   — and never touch these directly);
@@ -24,16 +22,13 @@ library;
 export 'src/container/container_debug.dart'
     show
         ContainerDebug,
-        ContainerDebugExt,
+        ContainerDebugExtensions,
         FeatureDebugInfo,
         FeatureDependency,
         PortDebugInfo;
-export 'src/container/port_subscription.dart' show PortSubscription;
 export 'src/logger/logger.dart' show LoggerDebugInfo;
 export 'src/port/behavior.dart' show BehaviorHandler;
 export 'src/port/pipe.dart' show PipeHandler;
-export 'src/port/port.dart' show AnyPort, Port;
-export 'src/port/port_type.dart' show PortType;
 export 'src/store/state.dart'
     show StateChangeListener, StateListenerDisposer, StateUpdateCallback;
 export 'src/store/task.dart'

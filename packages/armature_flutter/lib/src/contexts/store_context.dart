@@ -46,14 +46,11 @@ class StoreContext {
 
 /// Shortcut extension for store lookup from [BuildContext].
 ///
-/// `context.store<T>()` is the inverse of the Provider-style naming
-/// (`context.read<T>()`) and matches the imperative semantics: it
-/// does **not** subscribe the enclosing widget to rebuilds when the
-/// store's state changes. Wrap the read in a [StateObserver] / a
-/// `StoreBuilder<T>` (or call it from inside one) when reactivity is
-/// required; use it directly inside event handlers (`onTap`, …) where
-/// only a one-shot read is needed.
-extension BuildContextStoreExt on BuildContext {
+/// Non-reactive — does NOT subscribe the enclosing widget to rebuilds.
+/// Use directly inside event handlers (`onTap`, …) for one-shot reads;
+/// for reactive reads wrap in [StateObserver] / `StoreBuilder<T>` /
+/// `StoreSelector<V>`.
+extension BuildContextStoreExtensions on BuildContext {
   /// Equivalent to `StoreContext.of<T>(this)`.
   T store<T extends Store>() => StoreContext.of<T>(this);
 }

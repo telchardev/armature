@@ -23,8 +23,10 @@ final inspectorFeature =
       ..useSingleSlot(layoutFeature.ports.bodyKeyedSlot('inspector'), (_, api) {
         return InspectorTab(store: api.own.inspector);
       })
-      ..onStart((_, _) async {
+      ..onStart((api, cleanup) async {
         await Future<void>.delayed(const Duration(seconds: 3));
+
+        cleanup.add(() => api.own.inspector.clear());
       })
       // Reactive gate: activation tracks the `inspector` toggle in
       // FeatureToggles. In release builds the feature never activates,

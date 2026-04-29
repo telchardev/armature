@@ -1,4 +1,4 @@
-import 'package:armature/advanced.dart' show PortSubscription;
+import 'package:armature/framework.dart' show PortSubscription;
 import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, State;
 

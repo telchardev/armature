@@ -158,7 +158,7 @@ final class AppContainer {
   });
 
   /// Raw dependency graph backing this container. Exposed for
-  /// framework-internal consumers (notably `ContainerDebugExt.debug`)
+  /// framework-internal consumers (notably `ContainerDebugExtensions.debug`)
   /// — application code should read through `debug` instead.
   @internal
   Graph<AnyFeature> get graph => _orchestrator.graph;
@@ -268,30 +268,12 @@ final class AppContainer {
   }
 
   Future<void> _runStop() async {
-    // Forbid stop invoked from within a feature lifecycle callback
-    // (setup / onStart). Awaiting `_startFuture` from inside such a
-    // callback would self-deadlock; throwing gives a clearer signal
-    // for the bug. Detected via a zone marker installed by
-    // [runAsUserCallback] around user-supplied callbacks — this does
-    // NOT fire for `stop()` called from outside `start()` while a
-    // start is merely in flight in the background.
-    //
-    // Yield one microtask first so that the synchronous reject flows
-    // naturally through the awaiting user code via the returned
-    // Future (pre-await sync throws in async functions settle the
-    // returned Future after the caller's frame has unwound).
+    // Yield one microtask first so the synchronous reject below flows
+    // naturally through awaiting user code via the returned Future
+    // (pre-await sync throws in async functions settle the returned
+    // Future after the caller's frame has unwound).
     await null;
-    if (Zone.current[userCallbackZoneKey] == true) {
-      // Clear the cached future so a later, legitimate stop() call
-      // from outside the user callback can run instead of replaying
-      // this rejection.
-      _stopping = null;
-      throw ContainerUsageError(
-        'AppContainer.stop() cannot be called from within a feature '
-        'lifecycle callback. Schedule the stop outside of it '
-        '(e.g. unawaited(Future.microtask(container.stop))).',
-      );
-    }
+    _assertNotInUserCallback();
 
     // Already idle — nothing to tear down. Clear the cached future so
     // a subsequent stop() after a new start() runs fresh.
@@ -300,31 +282,7 @@ final class AppContainer {
       return;
     }
 
-    // Wait for any in-flight start() to settle before tearing down.
-    // Otherwise teardown races with feature resolution and leaves
-    // handler registrations + partially-initialised stores behind.
-    // The orchestrator's start phases observe `isStopping` (true while
-    // `_stopping` is non-null) and short-circuit — so the wait is
-    // bounded by however long the current phase takes to drain.
-    //
-    // Only wait when status is `.starting` — that's when the start is
-    // actively running orchestrator phases. A start that's still
-    // queued waiting for *us* (mutual await via `_runStart`'s
-    // `await _stopping` step) hasn't transitioned status yet; awaiting
-    // it here would deadlock because each side waits for the other.
-    if (_status == ContainerStatus.starting) {
-      final pendingStart = _startFuture;
-      if (pendingStart != null) {
-        try {
-          await pendingStart;
-        } on Object {
-          // start() failed; `_rollback()` already ran. We still proceed
-          // with teardown below in case rollback produced no effect
-          // (e.g. graph never built).
-        }
-      }
-    }
-
+    await _awaitInFlightStart();
     await _teardownFeatures();
     _events.clearListeners();
 
@@ -335,6 +293,37 @@ final class AppContainer {
       _debugFinalizer.detach(this);
       return true;
     }());
+  }
+
+  /// Rejects `stop()` calls from inside a feature lifecycle callback
+  /// (setup / `onStart`); awaiting `_startFuture` from there would
+  /// self-deadlock. Detected via the zone marker installed by
+  /// [runAsUserCallback].
+  void _assertNotInUserCallback() {
+    if (Zone.current[userCallbackZoneKey] == true) {
+      _stopping = null;
+      throw ContainerUsageError(
+        'AppContainer.stop() cannot be called from within a feature '
+        'lifecycle callback. Schedule the stop outside of it '
+        '(e.g. unawaited(Future.microtask(container.stop))).',
+      );
+    }
+  }
+
+  /// Waits for an in-flight `start()` to settle before teardown so
+  /// handler registrations and partially-initialised stores aren't
+  /// orphaned. Errors from the awaited start are swallowed —
+  /// `_rollback()` already ran on its failure path; teardown still
+  /// proceeds for safety.
+  Future<void> _awaitInFlightStart() async {
+    if (_status != ContainerStatus.starting) return;
+    final pendingStart = _startFuture;
+    if (pendingStart == null) return;
+    try {
+      await pendingStart;
+    } on Object {
+      // Already rolled back by _runStart's catch; keep going.
+    }
   }
 
   /// Whether a [stop] is in progress. Internal signal for the
@@ -720,34 +709,10 @@ final class AppContainer {
       if (!isStopping) {
         _status = ContainerStatus.working;
       }
-      // Graph-level misconfiguration surfaces as the sealed [GraphError]
-      // family; re-wrap each variant into [FeatureResolutionError] so
-      // callers match a single framework type for every resolution
-      // failure. `GraphFixedPointError` — triggered by a toggle cycle
-      // in activation setups that never stabilises — shares the
-      // `cycle` reason with structural cycle detection.
       // ignore: avoid_catching_errors
     } on GraphError catch (e) {
       await _rollback();
-      throw switch (e) {
-        GraphNodeNotFoundError(:final referencedBy, :final missing) =>
-          FeatureResolutionError(
-            referencedBy,
-            'Feature "$referencedBy" depends on "$missing" which is '
-            'not listed in AppContainer.features.',
-            reason: FeatureResolutionReason.missingParent,
-          ),
-        GraphCycleError(:final message) => FeatureResolutionError(
-          message,
-          message,
-          reason: FeatureResolutionReason.cycle,
-        ),
-        GraphFixedPointError(:final message) => FeatureResolutionError(
-          'lifecycle',
-          message,
-          reason: FeatureResolutionReason.cycle,
-        ),
-      };
+      throw _wrapGraphError(e);
     } on Object {
       await _rollback();
       rethrow;
@@ -756,13 +721,37 @@ final class AppContainer {
     }
   }
 
-  /// Polished rollback: when `start()` fails midway, undo every
-  /// side-effect it produced so the container is in a clean `.idle`
-  /// state indistinguishable from a freshly-constructed one. A
-  /// subsequent `start()` can then run without replaying stale
-  /// handlers or partially-initialised stores. Unlike [stop], rollback
-  /// also drops registered event listeners so observers don't witness
-  /// partial states from the failed attempt on the next try.
+  /// Re-wraps a sealed [GraphError] variant into the public
+  /// [FeatureResolutionError] family so callers match a single
+  /// framework type for every resolution failure. `GraphFixedPointError`
+  /// — triggered by a toggle cycle in activation setups that never
+  /// stabilises — shares the `cycle` reason with structural cycle
+  /// detection.
+  FeatureResolutionError _wrapGraphError(GraphError e) {
+    return switch (e) {
+      GraphNodeNotFoundError(:final referencedBy, :final missing) =>
+        FeatureResolutionError(
+          referencedBy,
+          'Feature "$referencedBy" depends on "$missing" which is '
+          'not listed in AppContainer.features.',
+          reason: FeatureResolutionReason.missingParent,
+        ),
+      GraphCycleError(:final message) => FeatureResolutionError(
+        message,
+        message,
+        reason: FeatureResolutionReason.cycle,
+      ),
+      GraphFixedPointError(:final message) => FeatureResolutionError(
+        'lifecycle',
+        message,
+        reason: FeatureResolutionReason.cycle,
+      ),
+    };
+  }
+
+  /// Reverts a failed `start()`: tears down features, clears event
+  /// listeners (so observers don't see partial state on the retry),
+  /// and returns the container to `.idle`.
   Future<void> _rollback() async {
     await _teardownFeatures();
     _events.clearListeners();

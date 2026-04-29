@@ -160,7 +160,12 @@ class Context {
   }
 
   void _propagateChanged(Atom atom) {
-    for (final observer in atom._observers) {
+    final observers = atom._observers;
+    if (observers.length == 1) {
+      observers.first._onBecomeStale();
+      return;
+    }
+    for (final observer in observers) {
       observer._onBecomeStale();
     }
   }
@@ -176,11 +181,11 @@ class Context {
 
   void _clearAtoms(Reaction reaction) {
     final observables = reaction._atoms;
-    reaction._atoms = {};
-
+    if (observables.isEmpty) return;
     for (final x in observables) {
       x._removeObserver(reaction);
     }
+    observables.clear();
   }
 
   void _endTracking(Reaction currentReaction, Reaction? prevReaction) {

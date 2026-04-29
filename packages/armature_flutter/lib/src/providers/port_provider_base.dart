@@ -1,5 +1,5 @@
-import 'package:armature/advanced.dart' show PortSubscription;
 import 'package:armature/armature.dart' show RenderError;
+import 'package:armature/framework.dart' show PortSubscription;
 import 'package:flutter/widgets.dart' show State, StatefulWidget;
 
 import '../contexts/container_context.dart' show ContainerContext;
@@ -33,10 +33,8 @@ abstract class PortProviderState<TValue, TInputData, W extends StatefulWidget>
   TValue get value => _sub?.value ?? fallbackValue;
 
   /// The active subscription, or `null` if initialisation failed.
-  /// Subclasses use this from `didUpdateWidget` to forward
-  /// [PortSubscription.reapply] when only the port's inputs
-  /// (`initialValue` / `data`) changed — that's cheaper than
-  /// [resubscribe] which allocates a fresh [PortSubscription].
+  /// Use it from `didUpdateWidget` to call [PortSubscription.reapply]
+  /// for input-only changes; for port changes use [resubscribe].
   PortSubscription<TValue, TInputData>? get subscription => _sub;
 
   /// Creates a reactive subscription to the current port with the

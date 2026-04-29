@@ -410,12 +410,7 @@ class GraphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant GraphPainter oldDelegate) {
-    // `DebugFeatureNode` fields (`status`, `position`, `ports`,
-    // `handlerCount`, `resolveTime`) mutate in place — node drag and
-    // status flips keep the same `nodes` map reference. A content-
-    // based compare would have to walk every node on every build, so
-    // for the debug overlay we just always repaint: it's cheap
-    // relative to the rest of the overlay and avoids silent staleness.
+    // Node fields mutate in place; always repaint (debug overlay).
     return true;
   }
 }

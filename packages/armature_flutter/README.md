@@ -126,6 +126,34 @@ StoreSelector<({String name, int count})>(
 )
 ```
 
+### `StoreListener<S>` — side effects without rebuild
+
+For navigation, snackbars, analytics — fires `listener` on transitions matching the optional `listenWhen` predicate, never rebuilds `child`.
+
+```dart
+StoreListener(
+  store: context.store<AuthStore>(),
+  listenWhen: (prev, next) => !prev.isLoggedIn && next.isLoggedIn,
+  listener: (ctx, _) => Navigator.of(ctx).pushReplacementNamed('/home'),
+  child: const LoginForm(),
+)
+```
+
+### `TaskBuilder` — reactive four-way switch on `Task.state`
+
+Renders one of four branches per `TaskIdle / TaskPending / TaskDone / TaskFailed`. Generics infer from the `task` argument.
+
+```dart
+// store.fetchUser: Task<int, User, ApiException>
+TaskBuilder(
+  task: store.fetchUser,
+  idle:    (_)         => const _Placeholder(),
+  pending: (_, userId) => const CircularProgressIndicator.adaptive(),
+  done:    (_, user)   => UserCard(user),
+  failed:  (_, e)      => ErrorBanner(message: e.message),
+)
+```
+
 ## Slots — composing UI across features
 
 Slots are ports that produce widgets. The owning feature declares the slot; child features contribute widgets via extensions.
