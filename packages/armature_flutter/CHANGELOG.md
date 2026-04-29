@@ -1,3 +1,65 @@
+## 1.0.0
+
+> First stable release. Tracks `armature` 1.0.0; existing widgets and
+> providers from 0.4.0 are unchanged. New widgets (`StoreListener`,
+> `TaskBuilder`) are additive.
+
+### Added
+
+- **`StoreListener<S>`** — side-effect host for a `Store<S>` that fires
+  the listener on transitions without rebuilding `child`. The state
+  generic infers from the `store: Store<S>` argument; an optional
+  `listenWhen: (prev, next) => ...` predicate filters which transitions
+  trigger the callback. Use for navigation, snackbars, analytics —
+  anywhere `StoreBuilder` would over-rebuild.
+
+  ```dart
+  StoreListener(
+    store: context.store<AuthStore>(),
+    listenWhen: (p, n) => !p.isLoggedIn && n.isLoggedIn,
+    listener: (ctx, _) => Navigator.of(ctx).pushReplacementNamed('/home'),
+    child: const LoginForm(),
+  )
+  ```
+
+- **`TaskBuilder`** — reactive four-way switch on `Task.state`. All
+  three generics (`TParams`, `TResult`, `TError`) infer from the `task`
+  argument; the four branch builders (`idle`, `pending`, `done`,
+  `failed`) are required so the compiler enforces exhaustive coverage.
+
+  ```dart
+  TaskBuilder(
+    task: store.fetchUser, // Task<int, User, ApiException>
+    idle:    (_)         => const _Placeholder(),
+    pending: (_, userId) => const CircularProgressIndicator.adaptive(),
+    done:    (_, user)   => UserCard(user),
+    failed:  (_, e)      => ErrorBanner(message: e.message),
+  )
+  ```
+
+### Performance
+
+- **`MultiPortBuilder` build hoists** — the per-build `tracked` Set,
+  `_reconcile` `stale` List, and error-reporter closure are now
+  allocated once in `initState` and reused, instead of being recreated
+  on every reactive rebuild.
+- **`MultiSlot.apply` empty-handlers / empty-entries fast paths** —
+  return `initialValue` directly when the port has no registered
+  handlers, or when no active feature contributes a descriptor for the
+  current `data` payload, instead of allocating an empty `entries`
+  list and copying `initialValue` into a new `List<Widget>`.
+
+### Internal
+
+- Switched from `package:armature/advanced.dart` to
+  `package:armature/framework.dart` for `Port` / `PortType`. The
+  `framework.dart` barrel is the new home for sibling-package
+  plumbing types.
+
+### Depends on
+
+- `armature: ^1.0.0` (was `^0.4.0`).
+
 ## 0.4.0
 
 > Tracks the `armature` 0.4.0 container lifecycle rename. No new

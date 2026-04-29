@@ -1,5 +1,4 @@
-import 'package:armature/armature.dart'
-    show Task, TaskState, TaskStateExtensions;
+import 'package:armature/armature.dart' show Task, TaskStateExtensions;
 import 'package:flutter/widgets.dart';
 
 import './state_observer.dart' show StateObserver;

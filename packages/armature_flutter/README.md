@@ -11,8 +11,8 @@ Flutter integration for [`armature`](https://pub.dev/packages/armature) — app 
 
 ```yaml
 dependencies:
-  armature: ^0.4.0
-  armature_flutter: ^0.4.0
+  armature: ^1.0.0
+  armature_flutter: ^1.0.0
 ```
 
 ## Quickstart

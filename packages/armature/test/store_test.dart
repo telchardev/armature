@@ -463,10 +463,14 @@ void main() {
       // Touch every `late final` task so it lands in Store._tasks
       // before dispose; otherwise the late-init would resolve them
       // AFTER teardown, against a fresh state (not what we test).
-      store.queueSequentialTask;
-      store.onceSuccessTask;
-      store.debounceTask;
-      store.throttleTask;
+      // Returned tuple is unused — discarding it via `_` keeps
+      // `unnecessary_statements` quiet without per-line ignores.
+      final _ = (
+        store.queueSequentialTask,
+        store.onceSuccessTask,
+        store.debounceTask,
+        store.throttleTask,
+      );
       await store.onceSuccessTask(const TaskParams(1));
 
       expect(() => store.dispose(), returnsNormally);

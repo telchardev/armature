@@ -1,5 +1,4 @@
 import 'package:armature/advanced.dart' show BehaviorHandler, PipeHandler;
-import 'package:armature/framework.dart' show Port;
 import 'package:armature/armature.dart'
     show
         AppContainer,
@@ -9,6 +8,7 @@ import 'package:armature/armature.dart'
         Feature,
         Pipe,
         RenderError;
+import 'package:armature/framework.dart' show Port;
 import 'package:armature_reactive/armature_reactive.dart' show Reaction;
 import 'package:flutter/widgets.dart'
     show BuildContext, State, StatefulWidget, Widget;

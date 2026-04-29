@@ -134,8 +134,8 @@ flowchart TB
 
 | Package | Version | Dart SDK | pub.dev |
 |---------|---------|----------|---------|
-| `armature` | 0.4.0   | `^3.9.0` | [→](https://pub.dev/packages/armature) |
-| `armature_flutter` | 0.4.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_flutter) |
+| `armature` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature) |
+| `armature_flutter` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_flutter) |
 | `armature_reactive` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_reactive) |
 | `armature_graph` | 1.0.0   | `^3.9.0` | [→](https://pub.dev/packages/armature_graph) |
 

@@ -1,11 +1,6 @@
 import './task.dart'
     show TaskDone, TaskFailed, TaskIdle, TaskPending, TaskState;
 
-typedef _TaskWhenIdle<T> = T Function();
-typedef _TaskWhenPending<TParams, T> = T Function(TParams params);
-typedef _TaskWhenDone<TResult, T> = T Function(TResult result);
-typedef _TaskWhenFailed<TError, T> = T Function(TError error);
-
 /// Ergonomic pattern matching for [TaskState]. [when] requires all
 /// four branches and is checked for exhaustiveness; [maybeWhen]
 /// accepts a subset and falls through to [orElse]. Boolean and
@@ -24,10 +19,10 @@ extension TaskStateExtensions<TParams, TResult, TError>
   /// Exhaustive pattern match. All four branches required; returns
   /// the value produced by the matching branch.
   T when<T>({
-    required _TaskWhenIdle<T> idle,
-    required _TaskWhenPending<TParams, T> pending,
-    required _TaskWhenDone<TResult, T> done,
-    required _TaskWhenFailed<TError, T> failed,
+    required T Function() idle,
+    required T Function(TParams params) pending,
+    required T Function(TResult result) done,
+    required T Function(TError error) failed,
   }) {
     final self = this;
     if (self is TaskIdle<TParams, TResult, TError>) return idle();
@@ -44,10 +39,10 @@ extension TaskStateExtensions<TParams, TResult, TError>
   /// unmatched states route through [orElse], which receives the
   /// original state for inspection.
   T maybeWhen<T>({
-    _TaskWhenIdle<T>? idle,
-    _TaskWhenPending<TParams, T>? pending,
-    _TaskWhenDone<TResult, T>? done,
-    _TaskWhenFailed<TError, T>? failed,
+    T Function()? idle,
+    T Function(TParams params)? pending,
+    T Function(TResult result)? done,
+    T Function(TError error)? failed,
     required T Function(TaskState<TParams, TResult, TError> state) orElse,
   }) {
     final self = this;

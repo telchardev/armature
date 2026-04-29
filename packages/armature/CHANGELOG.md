@@ -1,3 +1,80 @@
+## 1.0.0
+
+> First stable release. Public API surface in `package:armature/armature.dart`
+> is committed: every symbol exported from that barrel follows semver from
+> here on. Code written against `0.4.0` continues to compile — `1.0.0` is
+> additive on top of it.
+
+### Added — DX
+
+- **`StoreListener` / `TaskBuilder`** (Flutter side) — new widgets in
+  `armature_flutter` that pair with this release. See that package's
+  changelog for details.
+- **`TaskStateExtensions`** on `TaskState<TParams, TResult, TError>`:
+  - `.when({idle, pending, done, failed})` — exhaustive pattern match.
+  - `.maybeWhen({...}, orElse:)` — partial match with fallback.
+  - `.isIdle` / `.isPending` / `.isDone` / `.isFailed` — branch booleans.
+  - `.paramsOrNull` / `.resultOrNull` / `.errorOrNull` — branch payload
+    getters.
+- **Task awaiters** — `Task.firstWhere(predicate)`, `Task.awaitDone()`,
+  `Task.awaitFailed()`, `Task.awaitSettled()`. Useful in tests and
+  orchestration scripts that need to gate on a transition without
+  spinning up a reaction.
+- **`Store.subscribeSelect(selector, listener, {fireImmediately, equals})`**
+  — equality-filtered projection with optional custom equality (e.g.
+  `listEquals` for collection-typed selectors). Replaces the
+  `StoreSubscribeExtensions` proposal — lives directly on `Store<T>`.
+- **`package:armature/framework.dart`** — new barrel for sibling-package
+  plumbing. Exposes `Port`, `AnyPort`, `PortType`, `PortSubscription`
+  for `armature_flutter` and custom `Renderer` implementations.
+  **Application code should not import it** — the typed APIs in
+  `armature.dart` cover every end-user scenario.
+
+### Fixed
+
+- **Listener errors in `State`** are now isolated. Each listener call is
+  wrapped in `try/catch`; a single captured error rethrows with its
+  original stack trace, multiple errors surface through the new internal
+  `StateListenerErrors` aggregate. A throwing listener no longer aborts
+  its siblings or the surrounding `state =` setter.
+- **`Store.dispose()` isolates each `task.dispose()` call** so a
+  misbehaving task can't prevent siblings from being torn down. Same
+  single/aggregate semantics via internal `TaskDisposeErrors`.
+- **`FeatureOrchestrator._onToggle` switched to a batched FIFO queue**
+  with microtask-deferred drain. Eliminates re-entrant cascade chains
+  from inside lifecycle callbacks — resolves the deadlock under
+  `maxResolveConcurrency: 1` and the fixed-point livelock when a
+  reactive subscription toggles during an active cascade. The
+  `armature_graph` package was not touched.
+- **`FeatureRuntime.teardown` clears `_cleanupOnError`** so prior-cycle
+  closures don't pin the container's error handler / logger references
+  across `start` / `stop` cycles.
+- **`PrintLogger.log` wraps `JsonEncoder.convert` in try/catch** with a
+  `toString()` fallback so a non-encodable `debugInfo` map can no
+  longer crash the framework.
+
+### Performance
+
+- **State `_notifyListeners` fast path** — single-listener writes skip
+  the try/catch + error list allocation entirely; the listener throws
+  propagate naturally.
+- **Atom `_propagateChanged` fast path** — single-observer atoms skip
+  iterator allocation on every `reportChanged()`.
+- **`Reaction._clearAtoms` reuses the atom set** in place of allocating
+  a fresh empty set on every clear; early-return when the set is
+  already empty.
+- **`Task._flushLatestPending` single-completer fast path** — the
+  common `.latest` case (one pending caller) skips the defensive
+  `List.from()` snapshot.
+
+### Internal
+
+- `PortType` / `AnyPort` / `Port` / `PortSubscription` moved out of
+  `package:armature/advanced.dart` into `package:armature/framework.dart`.
+  `advanced.dart` now holds only application-facing escape-hatch types
+  (handler typedefs, individual `TaskStrategy*` constructors,
+  debug-overlay mirrors).
+
 ## 0.4.0
 
 > Breaking release: container lifecycle reshaped around `stop()`.
