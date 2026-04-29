@@ -460,11 +460,6 @@ Future<void> main() async {
         await container.stop();
         await container.start();
 
-        // Without ownActive reset, the first cycle's `toggle(.active)`
-        // would persist and the feature would re-activate without setup
-        // running through its non-activating branch. Reset puts it back
-        // to the construction default
-        // (`activationSetup != null ⇒ false`).
         expect(container.statusOf(feature), equals(FeatureStatus.disabled));
       });
     });
@@ -590,12 +585,6 @@ Future<void> main() async {
       test(
         'apply() during .starting returns partial snapshot without throwing',
         () async {
-          // R4 is intentionally not fixed: apply() during .starting keeps
-          // working on the currently-resolved subset of features. This
-          // test locks the behavior in — the snapshot reflects only
-          // handlers of features that are already active at the call
-          // site (none here, because the single feature sits behind an
-          // async activation setup delay).
           final root = createFeature(name: "root");
           final pipe = createPipe<int>(name: "p", feature: root);
           final child = createFeature(name: "child", dependsOn: [root])

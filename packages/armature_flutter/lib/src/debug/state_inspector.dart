@@ -3,7 +3,7 @@ import 'package:armature/armature.dart' show FeatureStatus, Store;
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart' show internal;
 
-import '../services/state_observer.dart' show StateObserver;
+import '../stores/state_observer.dart' show StateObserver;
 import './debug_theme.dart';
 import './format_state.dart' show formatState;
 

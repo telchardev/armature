@@ -16,7 +16,7 @@ import '../contexts/container_context.dart' show ContainerContext;
 import '../contexts/feature_context.dart' show FeatureContext;
 import '../ports/multi_slot.dart' show MultiSlot, MultiSlotHandler;
 import '../ports/single_slot.dart' show SingleSlot, SingleSlotHandler;
-import '../services/safe_set_state_mixin.dart' show SafeSetStateMixin;
+import '../stores/safe_set_state_mixin.dart' show SafeSetStateMixin;
 
 typedef _AnyPort = Port<dynamic, Object?, Function>;
 

@@ -18,6 +18,48 @@ typedef StateUpdateCallback<TState> = TState Function(TState state);
 /// idempotent — repeated calls are safe no-ops.
 typedef StateListenerDisposer = void Function();
 
+/// Framework-internal aggregate thrown by the `state =` setter when
+/// **multiple** registered [StateChangeListener]s threw during a single
+/// notification pass.
+///
+/// Listener errors are isolated — every listener is given a chance to
+/// run regardless of what its siblings did. After the pass:
+///
+///   * 0 errors → setter returns normally.
+///   * 1 error → that error is rethrown with its original stack trace
+///     (callers `catch`-ing a specific exception type still match).
+///   * ≥ 2 errors → all of them are surfaced together via this class.
+///
+/// Not exported through the public barrel — when these reach a Store
+/// owner via `FeatureRuntime.teardown` they are repackaged into a
+/// `HandlerError` (its `toString()` carries the diagnostic). The class
+/// stays `@internal` so application code doesn't depend on the
+/// concrete type. If you need structured access in your own tests,
+/// import `package:armature/src/store/state.dart` directly.
+@internal
+class StateListenerErrors implements Exception {
+  /// Captured throws, in the order their listeners were invoked. Each
+  /// entry pairs the original exception with its stack trace.
+  final List<({Object error, StackTrace stackTrace})> errors;
+
+  /// Wraps [errors] in an unmodifiable view. Caller retains the original
+  /// stack traces for each entry.
+  StateListenerErrors(List<({Object error, StackTrace stackTrace})> errors)
+    : errors = List.unmodifiable(errors);
+
+  @override
+  String toString() {
+    final buf = StringBuffer(
+      'StateListenerErrors: ${errors.length} listener errors during '
+      'state notification:\n',
+    );
+    for (var i = 0; i < errors.length; i++) {
+      buf.writeln('  [$i] ${errors[i].error}');
+    }
+    return buf.toString();
+  }
+}
+
 /// Framework-internal observable value holder backing every [Store].
 ///
 /// Wraps a mutable `_state` field plus an [Atom] for reactive tracking
@@ -126,15 +168,42 @@ class State<TState> {
   /// Multi-listener states iterate a snapshot so listeners are free
   /// to subscribe / unsubscribe during their own invocation (classic
   /// one-shot listener pattern).
+  ///
+  /// Error isolation: every listener invocation is wrapped in a
+  /// try/catch so a throwing listener never prevents subsequent ones
+  /// from firing (mirrors [Emitter.emit]'s contract). After every
+  /// listener has had a chance to run:
+  ///
+  ///   * 0 captured errors → return normally.
+  ///   * 1 captured error → rethrow it with its original stack trace.
+  ///   * ≥ 2 captured errors → throw [StateListenerErrors] with the
+  ///     full list so the caller can see every failure.
   void _notifyListeners(TState prevState, TState state) {
     final count = _changeStateListeners.length;
     if (count == 0) return;
+
+    final errors = <({Object error, StackTrace stackTrace})>[];
+
+    void notify(StateChangeListener<TState> listener) {
+      try {
+        listener(prevState, state);
+      } on Object catch (e, st) {
+        errors.add((error: e, stackTrace: st));
+      }
+    }
+
     if (count == 1) {
-      _changeStateListeners.first(prevState, state);
-      return;
+      notify(_changeStateListeners.first);
+    } else {
+      for (final listener in _changeStateListeners.toList(growable: false)) {
+        notify(listener);
+      }
     }
-    for (final listener in _changeStateListeners.toList(growable: false)) {
-      listener(prevState, state);
+
+    if (errors.isEmpty) return;
+    if (errors.length == 1) {
+      Error.throwWithStackTrace(errors.first.error, errors.first.stackTrace);
     }
+    throw StateListenerErrors(errors);
   }
 }

@@ -58,7 +58,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counterService = rootFeature.storeOf<_CounterStore>(container);
+      final counterStore = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,
@@ -73,7 +73,7 @@ void main() {
 
       expect(find.text('0'), findsOneWidget);
 
-      counterService.increment();
+      counterStore.increment();
       await tester.pumpAndSettle();
 
       expect(find.text('1'), findsOneWidget);
@@ -210,7 +210,7 @@ void main() {
       final container = await startedContainer(
         features: [rootFeature, childFeature],
       );
-      final counterService = rootFeature.storeOf<_CounterStore>(container);
+      final counterStore = rootFeature.storeOf<_CounterStore>(container);
 
       await pumpFeature(
         tester,
@@ -223,10 +223,10 @@ void main() {
         ),
       );
 
-      counterService.increment();
+      counterStore.increment();
       await tester.pumpAndSettle();
 
-      counterService.increment();
+      counterStore.increment();
       await tester.pumpAndSettle();
     });
   });

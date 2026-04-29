@@ -7,6 +7,8 @@ import '_helpers.dart';
 
 class _Counter extends Store<int> {
   _Counter() : super(state: 0);
+
+  void bump() => update((s) => s + 1);
 }
 
 void main() {
@@ -174,7 +176,7 @@ void main() {
     );
 
     test(
-      'services are eagerly constructed at start and reused across toggles',
+      'stores are eagerly constructed at start and reused across toggles',
       () async {
         var factoryCalls = 0;
         final feature = createFeature(
@@ -198,7 +200,7 @@ void main() {
         await container.toggleFeature(feature, ToggleState.active);
         await container.toggleFeature(feature, ToggleState.inactive);
         await container.toggleFeature(feature, ToggleState.active);
-        // Services are cached — factory is never re-invoked.
+        // Stores are cached — factory is never re-invoked.
         expect(factoryCalls, equals(1));
       },
     );
@@ -408,17 +410,6 @@ void main() {
       test(
         'onStart-triggered cascade drains before start() returns: A→B→C',
         () async {
-          // R7 fix end-to-end: A's onStart toggles B; B's onStart toggles C.
-          // Graph's tail-await must drain the nested recomputes before
-          // start() completes, so by the time the test sees .working,
-          // all three are active.
-          //
-          // Note: we use onStart (not setup) for the chain because setups
-          // run concurrently via Future.wait — their execution order
-          // w.r.t. captured-toggle availability isn't guaranteed. onStart
-          // runs during the cascade in topological order, so each
-          // parent's toggle is captured by its own setup before the
-          // child's onStart runs.
           late FeatureToggle toggleB;
           late FeatureToggle toggleC;
 
@@ -447,6 +438,130 @@ void main() {
           expect(container.statusOf(c) == FeatureStatus.active, isTrue);
         },
       );
+    });
+
+    group('re-entrancy: toggle from inside lifecycle callback', () {
+      test('toggleFeature from a post-start onStart with concurrency=1 '
+          'completes without deadlock', () async {
+        late AppContainer container;
+        final c = createFeature(name: 'c')..activation((_, _, _) {});
+        final b = createFeature(name: 'b')
+          ..activation((_, _, _) {})
+          ..onStart((_, _) async {
+            unawaited(container.toggleFeature(c, ToggleState.active));
+          });
+
+        container = AppContainer(
+          features: [b, c],
+          options: ContainerOptions(
+            errorHandler: ({required source, required error, required meta}) {},
+            maxResolveConcurrency: 1,
+          ),
+        );
+        addTearDown(container.stop);
+        await container.start();
+        await container
+            .toggleFeature(b, ToggleState.active)
+            .timeout(const Duration(seconds: 5));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(container.statusOf(b), FeatureStatus.active);
+        expect(container.statusOf(c), FeatureStatus.active);
+      });
+
+      test('reactive subscription that toggles in response to a mid-cascade '
+          'state change does not trip GraphFixedPointError', () async {
+        final counter = _Counter();
+        addTearDown(counter.dispose);
+
+        final a = createFeature(name: 'a')
+          ..activation((_, toggle, cleanup) {
+            cleanup.add(
+              counter.subscribe((_, next) {
+                unawaited(
+                  toggle(
+                    next.isEven ? ToggleState.active : ToggleState.inactive,
+                  ),
+                );
+              }, fireImmediately: true),
+            );
+          });
+        final b = createFeature(name: 'b')
+          ..onStart((_, _) async {
+            // Mid-cascade mutation that fires A's listener.
+            counter.bump();
+          });
+
+        final container = AppContainer(
+          features: [a, b],
+          options: ContainerOptions(
+            errorHandler: ({required source, required error, required meta}) {},
+          ),
+        );
+        addTearDown(container.stop);
+
+        await container.start().timeout(const Duration(seconds: 5));
+        expect(container.status, ContainerStatus.working);
+        expect(container.statusOf(b), FeatureStatus.active);
+        // Let any queued toggles from B's onStart settle.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        // After bump (counter=1, odd), A flipped to .inactive via the
+        // queued recompute — proving the cycle was broken.
+        expect(container.statusOf(a), FeatureStatus.disabled);
+      });
+    });
+
+    group('partial activation on cascade failure', () {
+      test('failing onStart leaves siblings active and required descendants '
+          'fail-closed (degraded mode)', () async {
+        // Topology:
+        //   parent   (auto-active)
+        //     ├── a  (auto-active, succeeds)
+        //     ├── b  (auto-active, onStart throws)
+        //     └── c  (depends on a + b → fail-closed when b fails)
+        //
+        // Per the documented `_applyCascade` contract: a stays
+        // `.active`, b lands `.disabled`, c never runs onActivate
+        // and settles `.disabled` because one required parent isn't
+        // active.
+        final errors = <ArmatureError>[];
+        final parent = createFeature(name: 'parent');
+        final a = createFeature(name: 'a', dependsOn: [parent]);
+        final b = createFeature(name: 'b', dependsOn: [parent])
+          ..onStart((_, _) => throw StateError('b boom'));
+        final c = createFeature(name: 'c', dependsOn: [parent, a, b]);
+
+        final container = AppContainer(
+          features: [parent, a, b, c],
+          options: ContainerOptions(
+            errorHandler: ({required source, required error, required meta}) {
+              errors.add(error);
+            },
+          ),
+        );
+        addTearDown(container.stop);
+        await container.start();
+
+        expect(container.statusOf(parent), FeatureStatus.active);
+        expect(
+          container.statusOf(a),
+          FeatureStatus.active,
+          reason: 'sibling that activated successfully stays active',
+        );
+        expect(
+          container.statusOf(b),
+          FeatureStatus.disabled,
+          reason: 'failed onStart settles .disabled',
+        );
+        expect(
+          container.statusOf(c),
+          FeatureStatus.disabled,
+          reason: 'required descendant of b fails closed',
+        );
+        // The failure surfaces through `errorHandler`.
+        expect(errors, isNotEmpty);
+        expect(errors.first, isA<HandlerError>());
+      });
     });
   });
 }

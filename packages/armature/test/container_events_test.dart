@@ -294,15 +294,6 @@ Future<void> main() async {
 
     group('debug finalizer', () {
       test('construct + dispose cycle does not throw', () async {
-        // In debug builds `AppContainer()` attaches itself to a static
-        // `Finalizer` (inside an `assert(() { ... }())` block) to emit
-        // a GC-time warning when a container is collected without
-        // dispose. `dispose()` detaches the finalizer symmetrically.
-        //
-        // This smoke-test guards both branches: a typo in either the
-        // attach or the detach call would throw at assertion time.
-        // Intentionally simple — reliably forcing a GC to observe the
-        // warning isn't feasible in Dart's test runner.
         expect(() async {
           final container = AppContainer(features: [createFeature(name: "f")]);
           await container.start();
@@ -313,17 +304,12 @@ Future<void> main() async {
       test(
         'multiple containers attach independently without interference',
         () async {
-          // `identityHashCode(this)` is used as the finalizer token; two
-          // containers must get distinct tokens so detach of one doesn't
-          // kill the other's warning.
           final c1 = AppContainer(features: [createFeature(name: "a")]);
           final c2 = AppContainer(features: [createFeature(name: "b")]);
           addTearDown(c1.stop);
           addTearDown(c2.stop);
           await c1.start();
           await c2.start();
-          // No exception from overlapping attach + detach on the static
-          // finalizer means the per-instance token scheme works.
           expect(c1.status, equals(ContainerStatus.working));
           expect(c2.status, equals(ContainerStatus.working));
         },

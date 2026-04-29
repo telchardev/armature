@@ -200,7 +200,7 @@ void main() {
         features: [rootFeature, childFeature],
       );
       initTestRenderer(container);
-      final toggleService = rootFeature.storeOf<_ToggleStore>(container);
+      final toggleStore = rootFeature.storeOf<_ToggleStore>(container);
 
       // Initially false → null
       var result = container.apply(
@@ -212,7 +212,7 @@ void main() {
       expect(result, isNull);
 
       // Toggle to true → widget appears
-      toggleService.toggle();
+      toggleStore.toggle();
 
       result = container.apply(
         rootFeature: rootFeature,
@@ -223,7 +223,7 @@ void main() {
       expect(result, isNotNull);
 
       // Toggle back to false → null again
-      toggleService.toggle();
+      toggleStore.toggle();
 
       result = container.apply(
         rootFeature: rootFeature,
@@ -357,7 +357,7 @@ void main() {
         features: [rootFeature, alwaysFeature, conditionalFeature],
       );
       initTestRenderer(container);
-      final toggleService = rootFeature.storeOf<_ToggleStore>(container);
+      final toggleStore = rootFeature.storeOf<_ToggleStore>(container);
 
       // Initially false → only 1 widget
       var result = container.apply(
@@ -369,7 +369,7 @@ void main() {
       expect(result, hasLength(1));
 
       // Toggle → 2 widgets
-      toggleService.toggle();
+      toggleStore.toggle();
 
       result = container.apply(
         rootFeature: rootFeature,
@@ -380,7 +380,7 @@ void main() {
       expect(result, hasLength(2));
 
       // Toggle back → 1 widget
-      toggleService.toggle();
+      toggleStore.toggle();
 
       result = container.apply(
         rootFeature: rootFeature,

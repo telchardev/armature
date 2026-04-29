@@ -110,12 +110,6 @@ class _LivePortSubscription<TValue, TInputData>
        _value = initialValue,
        _initialValue = initialValue,
        _data = data {
-    // `_notify` is stored once so both `Reaction.onInvalidate` and
-    // `AppContainer.onPortChanged` hold the same callable identity —
-    // important because the portChanged disposer must `remove` the
-    // very same instance that was added. Method tear-offs (e.g.
-    // `_notify = _reapplyAndNotifyMethod`) are not canonicalised for
-    // instance members in Dart; a closure is the safer bet.
     _notify = () {
       if (_disposed) return;
       _runApply();

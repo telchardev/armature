@@ -8,16 +8,16 @@ import 'feature_listeners.mocks.dart';
 typedef CounterState = ({int counter});
 typedef UserState = ({int id, String name});
 
-class CounterService extends Store<CounterState> {
-  CounterService({required super.state});
+class CounterStore extends Store<CounterState> {
+  CounterStore({required super.state});
 
   void increment() {
     update((state) => (counter: state.counter + 1));
   }
 }
 
-class UserService extends Store<UserState> {
-  UserService({required super.state});
+class UserStore extends Store<UserState> {
+  UserStore({required super.state});
 }
 
 class TestRepositories {
@@ -26,40 +26,39 @@ class TestRepositories {
   TestRepositories(this.firstRepository);
 }
 
-// Typed services containers
 class FirstStores {
-  final CounterService counter;
-  final UserService user;
+  final CounterStore counter;
+  final UserStore user;
 
   FirstStores({required this.counter, required this.user});
 }
 
 class SecondStores {
-  final CounterService counter;
+  final CounterStore counter;
 
   SecondStores({required this.counter});
 }
 
-class _TestService extends Store<int> {
-  _TestService() : super(state: 0);
+class _TestStore extends Store<int> {
+  _TestStore() : super(state: 0);
 
   void setValue(int value) {
     state = value;
   }
 }
 
-typedef _ParentServices = ({CounterService counter});
+typedef _ParentStores = ({CounterStore counter});
 
 void main() {
   group('stores factory', () {
-    test('typed servicesFactory returns a concrete record', () async {
-      var counterService = CounterService(state: (counter: 0));
-      var userService = UserService(state: (id: 1, name: "Test user"));
+    test('typed storesFactory returns a concrete record', () async {
+      var counter = CounterStore(state: (counter: 0));
+      var user = UserStore(state: (id: 1, name: "Test user"));
 
       final firstFeature = createFeature(
         name: "firstFeature",
         stores: (parentApi) {
-          return FirstStores(counter: counterService, user: userService);
+          return FirstStores(counter: counter, user: user);
         },
         exports: (api) => api.own,
       );
@@ -70,11 +69,11 @@ void main() {
 
       final stores =
           container.runtimeOf(firstFeature).scopeApi.stores as FirstStores;
-      expect(stores.counter, equals(counterService));
-      expect(stores.user, equals(userService));
+      expect(stores.counter, equals(counter));
+      expect(stores.user, equals(user));
     });
 
-    test('services factory can construct repositories in closure', () async {
+    test('stores factory can construct repositories in closure', () async {
       final repositories = TestRepositories(0);
       TestRepositories? factoredRepositories;
 
@@ -107,8 +106,8 @@ void main() {
       final feature = createFeature(
         name: "dup",
         stores: (parentApi) {
-          CounterService(state: (counter: 0));
-          return CounterService(state: (counter: 1));
+          CounterStore(state: (counter: 0));
+          return CounterStore(state: (counter: 1));
         },
         exports: (api) => api.own,
       );
@@ -129,14 +128,14 @@ void main() {
 
   group('parent API (api.of / activation)', () {
     test('parentApi.of() provides typed access to parent stores', () async {
-      var userService = UserService(state: (id: 1, name: "Test user"));
+      var userStore = UserStore(state: (id: 1, name: "Test user"));
 
       final firstFeature = createFeature(
         name: "firstFeature",
         stores: (parentApi) {
           return FirstStores(
-            counter: CounterService(state: (counter: 0)),
-            user: userService,
+            counter: CounterStore(state: (counter: 0)),
+            user: userStore,
           );
         },
         exports: (api) => api.own,
@@ -145,8 +144,8 @@ void main() {
       final secondFeature =
           createFeature(name: "secondFeature", dependsOn: [firstFeature])
             ..activation((parentApi, toggle, _) {
-              final parentServices = parentApi.of(firstFeature);
-              expect(parentServices.user, equals(userService));
+              final parentStores = parentApi.of(firstFeature);
+              expect(parentStores.user, equals(userStore));
               toggle(ToggleState.active);
             });
 
@@ -209,13 +208,13 @@ void main() {
         final optional = createFeature(
           name: "optional",
           stores: (parentApi) => FirstStores(
-            counter: CounterService(state: (counter: 0)),
-            user: UserService(state: (id: 7, name: "opt")),
+            counter: CounterStore(state: (counter: 0)),
+            user: UserStore(state: (id: 7, name: "opt")),
           ),
           exports: (api) => api.own,
         );
 
-        UserService? seenUser;
+        UserStore? seenUser;
         final child =
             createFeature(name: "child", optionalDependsOn: [optional])
               ..activation((parentApi, toggle, _) {
@@ -232,13 +231,13 @@ void main() {
       },
     );
 
-    test('activation setup can access typed parent services', () async {
+    test('activation setup can access typed parent stores', () async {
       final parent = createFeature(
         name: "parent",
         stores: (parentApi) {
           return FirstStores(
-            counter: CounterService(state: (counter: 0)),
-            user: UserService(state: (id: 1, name: "Test")),
+            counter: CounterStore(state: (counter: 0)),
+            user: UserStore(state: (id: 1, name: "Test")),
           );
         },
         exports: (api) => api.own,
@@ -248,8 +247,8 @@ void main() {
 
       final child = createFeature(name: "child", dependsOn: [parent])
         ..activation((parentApi, toggle, _) {
-          final services = parentApi.of(parent);
-          expect(services, isA<FirstStores>());
+          final stores = parentApi.of(parent);
+          expect(stores, isA<FirstStores>());
           parentAccessWorked = true;
           toggle(ToggleState.active);
         });
@@ -385,16 +384,16 @@ void main() {
     );
 
     test(
-      'services factory can call parentApi.of(requiredParent) directly',
+      'stores factory can call parentApi.of(requiredParent) directly',
       () async {
-        final parentService = CounterService(state: (counter: 42));
-        final parent = createFeature<_ParentServices, _ParentServices, void>(
+        final parentStore = CounterStore(state: (counter: 42));
+        final parent = createFeature<_ParentStores, _ParentStores, void>(
           name: "eager-parent",
-          stores: (_) => (counter: parentService),
+          stores: (_) => (counter: parentStore),
           exports: (api) => api.own,
         );
 
-        CounterService? capturedInChildFactory;
+        CounterStore? capturedInChildFactory;
         final child = createFeature(
           name: "eager-child",
           dependsOn: [parent],
@@ -411,7 +410,7 @@ void main() {
         addTearDown(container.stop);
         await container.start();
 
-        expect(capturedInChildFactory, same(parentService));
+        expect(capturedInChildFactory, same(parentStore));
       },
     );
 
@@ -478,7 +477,7 @@ void main() {
         // if any declared feature fails to construct, the whole
         // container can't start. Users who want resilience should
         // wrap the factory in try/catch and return a null / fallback
-        // services value.
+        // stores value.
         await expectLater(
           container.start,
           throwsA(isA<FeatureResolutionError>()),
@@ -489,19 +488,19 @@ void main() {
   });
 
   group('port subscriptions & onPortChanged', () {
-    test('observe tracks service state mutations; onPortChanged is '
+    test('observe tracks store state mutations; onPortChanged is '
         'handler-set only', () async {
       final listeners = MockListeners();
       final pipeFeature = createFeature(name: "pipeFeature");
       final intPipe = createPipe<int>(name: "one", feature: pipeFeature);
 
-      final counterService = CounterService(state: (counter: 0));
+      final counter = CounterStore(state: (counter: 0));
 
       final feature = createFeature(
         name: "feature",
         dependsOn: [pipeFeature],
         stores: (parentApi) {
-          return SecondStores(counter: counterService);
+          return SecondStores(counter: counter);
         },
         exports: (api) => api.own,
       );
@@ -537,8 +536,8 @@ void main() {
 
       expect(sub.value, equals(0));
 
-      counterService.increment();
-      counterService.increment();
+      counter.increment();
+      counter.increment();
 
       expect(observerChanges, equals(2));
       expect(sub.value, equals(2));
@@ -550,19 +549,19 @@ void main() {
 
   group('store dispose', () {
     test('Store.dispose() clears all listeners', () {
-      final service = _TestService();
+      final store = _TestStore();
       var callCount = 0;
 
-      service.subscribe((_, _) {
+      store.subscribe((_, _) {
         callCount++;
       });
 
-      service.setValue(1);
+      store.setValue(1);
       expect(callCount, equals(1));
 
-      service.dispose();
+      store.dispose();
 
-      service.setValue(2);
+      store.setValue(2);
       expect(callCount, equals(1));
     });
   });

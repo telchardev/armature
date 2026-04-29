@@ -38,6 +38,6 @@ export './src/renderer/flutter_renderer.dart'
         FlutterRendererLoaderBuilder,
         FlutterRendererOptions;
 export './src/renderer/renderer.dart' show Renderer, RenderRootResult;
-export './src/services/state_observer.dart' show StateObserver;
-export './src/services/store_builder.dart' show StoreBuilder;
-export './src/services/store_selector.dart' show StoreSelector;
+export './src/stores/state_observer.dart' show StateObserver;
+export './src/stores/store_builder.dart' show StoreBuilder;
+export './src/stores/store_selector.dart' show StoreSelector;

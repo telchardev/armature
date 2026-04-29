@@ -437,10 +437,6 @@ final class AppContainer {
 
     final error = port.check(container: this, applyingFeature: rootFeature);
     if (error != null) {
-      // Mis-scoped apply: report the error and return a "dead"
-      // subscription pinned at [initialValue]. The port's owner never
-      // changes, so no atom could un-break this — skip allocating a
-      // Reaction + event listener entirely.
       _callErrorHandler(source: rootFeature.name, error: error, meta: {});
       return PortSubscription.disabled(initialValue);
     }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection' show Queue;
 
 import 'package:armature_graph/armature_graph.dart'
     show Graph, GraphNodeStatus, GraphVisitor;
@@ -63,6 +64,21 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
   /// `ownActive` flags; a single consolidated `graph.resolve` afterwards
   /// applies every toggle in one cascade.
   bool _inSetupPhase = false;
+
+  /// FIFO buffer of [_onToggle] calls awaiting cascade dispatch. Each
+  /// entry carries the feature whose [Graph.recompute] will run plus
+  /// the [Completer] returned synchronously to the caller. The drain
+  /// loop pops one entry at a time and `await`s its recompute, so two
+  /// rapid toggles on different features are observed in invocation
+  /// order even when the second is issued from inside the first's
+  /// lifecycle callbacks.
+  final Queue<_PendingToggle> _pendingToggles = Queue<_PendingToggle>();
+
+  /// Whether [_drainPendingToggles] is currently running. Re-entrant
+  /// `_onToggle` calls (e.g. from inside an `onStart` body) observe
+  /// this flag, append to [_pendingToggles] and return the completer's
+  /// future without spawning a parallel drain.
+  bool _draining = false;
 
   /// Current lifecycle status of [feature]. `FeatureStatus.disabled`
   /// before [start] succeeds.
@@ -264,7 +280,37 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
     if (runtime.ownActive == active) return Future.value();
     runtime.ownActive = active;
     if (_inSetupPhase) return Future.value();
-    return graph.recompute(feature);
+
+    final completer = Completer<void>();
+    _pendingToggles.add(_PendingToggle(feature, completer));
+
+    if (!_draining) {
+      _draining = true;
+      scheduleMicrotask(() => unawaited(_drainPendingToggles()));
+    }
+    return completer.future;
+  }
+
+  Future<void> _drainPendingToggles() async {
+    try {
+      while (_pendingToggles.isNotEmpty) {
+        if (host.isStopping) {
+          while (_pendingToggles.isNotEmpty) {
+            _pendingToggles.removeFirst().completer.complete();
+          }
+          return;
+        }
+        final next = _pendingToggles.removeFirst();
+        try {
+          await graph.recompute(next.feature);
+          next.completer.complete();
+        } on Object catch (e, st) {
+          next.completer.completeError(e, st);
+        }
+      }
+    } finally {
+      _draining = false;
+    }
   }
 
   Future<void> _runActivationSetups(Graph<AnyFeature> g) async {
@@ -299,4 +345,10 @@ final class FeatureOrchestrator implements GraphVisitor<AnyFeature> {
       await Future.wait(pending, eagerError: false);
     }
   }
+}
+
+class _PendingToggle {
+  final AnyFeature feature;
+  final Completer<void> completer;
+  _PendingToggle(this.feature, this.completer);
 }

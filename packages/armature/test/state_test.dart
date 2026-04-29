@@ -157,6 +157,55 @@ void main() {
       expect(() => s.state = 1, throwsException);
     });
 
+    test('multi listener: only one throws → siblings still fire and the '
+        'single error is rethrown with its original stack trace', () {
+      final s = State<int>(state: 0);
+      var secondFired = false;
+      var thirdFired = false;
+      s.subscribe(
+        (_, _) => throw StateError('only boom'),
+        fireImmediately: false,
+      );
+      s.subscribe((_, _) => secondFired = true, fireImmediately: false);
+      s.subscribe((_, _) => thirdFired = true, fireImmediately: false);
+
+      // Single error is rethrown as-is so existing `throwsA(isA<X>())`
+      // matchers keep working.
+      expect(
+        () => s.state = 1,
+        throwsA(
+          isA<StateError>().having((e) => e.message, 'message', 'only boom'),
+        ),
+      );
+      expect(secondFired, isTrue);
+      expect(thirdFired, isTrue);
+    });
+
+    test('multi listener: when several throw → setter throws aggregate '
+        'StateListenerErrors carrying every captured error', () {
+      final s = State<int>(state: 0);
+      var middleFired = false;
+      s.subscribe((_, _) => throw StateError('boom 1'), fireImmediately: false);
+      s.subscribe((_, _) => middleFired = true, fireImmediately: false);
+      s.subscribe(
+        (_, _) => throw ArgumentError('boom 2'),
+        fireImmediately: false,
+      );
+
+      // The aggregate carries every throw, in invocation order.
+      expect(
+        () => s.state = 1,
+        throwsA(
+          isA<StateListenerErrors>().having(
+            (e) => e.errors.map((entry) => entry.error.toString()).toList(),
+            'errors[].error.toString()',
+            ['Bad state: boom 1', 'Invalid argument(s): boom 2'],
+          ),
+        ),
+      );
+      expect(middleFired, isTrue);
+    });
+
     test('disposer is idempotent — double dispose is safe', () {
       final s = State<int>(state: 0);
       var calls = 0;

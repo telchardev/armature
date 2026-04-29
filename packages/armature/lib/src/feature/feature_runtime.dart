@@ -246,5 +246,6 @@ final class FeatureRuntime<TStores extends Object?, TExports extends Object?> {
     _statusStore = _FeatureStatusStore();
     lifetimeCleanup = CleanupBag.sealed();
     currentCleanup = CleanupBag.sealed();
+    _cleanupOnError = null;
   }
 }

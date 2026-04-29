@@ -3,8 +3,8 @@ import 'package:armature_flutter/armature_flutter.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class TestService extends Store<int> {
-  TestService() : super(state: 0);
+class TestStore extends Store<int> {
+  TestStore() : super(state: 0);
 
   void increment() => update((state) => state + 1);
 }
@@ -12,14 +12,14 @@ class TestService extends Store<int> {
 void main() {
   group('StateObserver', () {
     testWidgets('rebuilds when tracked state changes', (tester) async {
-      final service = TestService();
+      final store = TestStore();
 
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
           child: StateObserver(
             builder: (context) {
-              return Text('count: ${service.state}');
+              return Text('count: ${store.state}');
             },
           ),
         ),
@@ -27,13 +27,13 @@ void main() {
 
       expect(find.text('count: 0'), findsOneWidget);
 
-      service.increment();
+      store.increment();
       await tester.pumpAndSettle();
 
       expect(find.text('count: 1'), findsOneWidget);
 
-      service.increment();
-      service.increment();
+      store.increment();
+      store.increment();
       await tester.pumpAndSettle();
 
       expect(find.text('count: 3'), findsOneWidget);
@@ -42,8 +42,8 @@ void main() {
     testWidgets('does not rebuild when untracked state changes', (
       tester,
     ) async {
-      final trackedService = TestService();
-      final untrackedService = TestService();
+      final trackedStore = TestStore();
+      final untrackedStore = TestStore();
       var buildCount = 0;
 
       await tester.pumpWidget(
@@ -52,7 +52,7 @@ void main() {
           child: StateObserver(
             builder: (context) {
               buildCount++;
-              return Text('count: ${trackedService.state}');
+              return Text('count: ${trackedStore.state}');
             },
           ),
         ),
@@ -60,21 +60,21 @@ void main() {
 
       final initialBuildCount = buildCount;
 
-      untrackedService.increment();
+      untrackedStore.increment();
       await tester.pumpAndSettle();
 
       expect(buildCount, equals(initialBuildCount));
     });
 
     testWidgets('cleans up reaction on dispose', (tester) async {
-      final service = TestService();
+      final store = TestStore();
 
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
           child: StateObserver(
             builder: (context) {
-              return Text('count: ${service.state}');
+              return Text('count: ${store.state}');
             },
           ),
         ),
@@ -91,7 +91,7 @@ void main() {
       );
 
       // Updating state after dispose should not throw
-      service.increment();
+      store.increment();
       await tester.pumpAndSettle();
 
       expect(find.text('count: 1'), findsNothing);

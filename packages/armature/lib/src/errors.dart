@@ -13,7 +13,7 @@
 ///   code): [TaskError], [FeatureConfigurationError],
 ///   [ContainerUsageError], [PortError], [StoreLookupError].
 /// * **Resolution failures** (thrown by `AppContainer.start()` when the
-///   graph or a services factory can't be brought up):
+///   graph or a stores factory can't be brought up):
 ///   [FeatureResolutionError] with a [FeatureResolutionReason].
 /// * **Recoverable runtime errors** (reported to
 ///   [ContainerErrorHandler], never thrown out of the framework):

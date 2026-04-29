@@ -91,13 +91,6 @@ void main() {
   test(
     'observe re-applies when a feature owning a handler toggles active',
     () async {
-      // Regression: the per-subscriber Reaction only tracks atoms read
-      // during apply. If a handler's feature is inactive at first apply,
-      // no atoms are read, so a later activation must still re-apply
-      // the subscription — otherwise the UI shows initialValue forever.
-      // This is fixed via a dedicated internal `portHandlersChanged`
-      // stream emitted from the orchestrator on activation /
-      // deactivation.
       final owner = createFeature(name: 'owner');
       final pipe = createPipe<int>(name: 'pipe', feature: owner);
 

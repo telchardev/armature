@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart' show State, StatefulWidget;
 
 import '../contexts/container_context.dart' show ContainerContext;
 import '../contexts/feature_context.dart' show FeatureContext;
-import '../services/safe_set_state_mixin.dart' show SafeSetStateMixin;
+import '../stores/safe_set_state_mixin.dart' show SafeSetStateMixin;
 
 /// Shared [State] base for the built-in port providers
 /// ([PipeProvider], [BehaviorProvider], [SingleSlotProvider],

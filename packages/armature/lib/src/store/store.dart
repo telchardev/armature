@@ -8,6 +8,47 @@ import './state.dart'
 import './task.dart'
     show Task, TaskStrategy, TaskFn, VoidTask, create, createVoid;
 
+/// Framework-internal aggregate thrown by [Store.dispose] when
+/// **multiple** owned [Task]s threw during teardown.
+///
+/// Task disposal errors are isolated — every owned task is given a
+/// chance to dispose regardless of what its siblings did. After the
+/// dispose pass:
+///
+///   * 0 errors → [Store.dispose] returns normally.
+///   * 1 error → that error is rethrown with its original stack trace
+///     (callers `catch`-ing a specific exception type still match).
+///   * ≥ 2 errors → all of them are surfaced together via this class.
+///
+/// Not exported through the public barrel — when these reach
+/// `FeatureRuntime.teardown` they are repackaged into a `HandlerError`
+/// (its `toString()` carries the diagnostic). The class stays
+/// `@internal` so application code doesn't depend on the concrete
+/// type. If you need structured access in your own tests, import
+/// `package:armature/src/store/store.dart` directly.
+@internal
+class TaskDisposeErrors implements Exception {
+  /// Captured throws, in the order their tasks were disposed. Each
+  /// entry pairs the original exception with its stack trace.
+  final List<({Object error, StackTrace stackTrace})> errors;
+
+  /// Wraps [errors] in an unmodifiable view.
+  TaskDisposeErrors(List<({Object error, StackTrace stackTrace})> errors)
+    : errors = List.unmodifiable(errors);
+
+  @override
+  String toString() {
+    final buf = StringBuffer(
+      'TaskDisposeErrors: ${errors.length} task disposal errors during '
+      'Store.dispose():\n',
+    );
+    for (var i = 0; i < errors.length; i++) {
+      buf.writeln('  [$i] ${errors[i].error}');
+    }
+    return buf.toString();
+  }
+}
+
 /// Base class for feature stores with reactive state.
 ///
 /// Subclass to hold the state of a feature slice plus the [Task]s that
@@ -189,13 +230,36 @@ abstract class Store<TState extends Object?> {
   /// components re-enter their own `_disposed` short-circuits).
   /// Subclasses that need custom teardown should override this
   /// method and invoke `super.dispose()` (`@mustCallSuper`).
+  ///
+  /// Error isolation: each owned [Task]'s `dispose()` call is wrapped
+  /// in a try/catch — a single misbehaving task never prevents its
+  /// siblings from being torn down. After every task has had a chance
+  /// to dispose:
+  ///
+  ///   * 0 captured errors → return normally.
+  ///   * 1 captured error → rethrow with its original stack trace
+  ///     (callers `catch`-ing a specific exception type still match).
+  ///   * ≥ 2 captured errors → throw [TaskDisposeErrors] with the full
+  ///     list so `FeatureRuntime.teardown` (and other callers up the
+  ///     chain) can route every failure through the container's error
+  ///     handler.
   @mustCallSuper
   void dispose() {
     _internalState.dispose();
+    final errors = <({Object error, StackTrace stackTrace})>[];
     for (final task in _tasks) {
-      task.dispose();
+      try {
+        task.dispose();
+      } on Object catch (e, st) {
+        errors.add((error: e, stackTrace: st));
+      }
     }
     _tasks.clear();
+    if (errors.isEmpty) return;
+    if (errors.length == 1) {
+      Error.throwWithStackTrace(errors.first.error, errors.first.stackTrace);
+    }
+    throw TaskDisposeErrors(errors);
   }
 
   /// Subscribes [listener] to state transitions. [listener] fires

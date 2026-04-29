@@ -90,5 +90,51 @@ void main() {
       expect(output.single, contains('plain'));
       expect(output.single, isNot(contains('=>')));
     });
+
+    test('falls back to toString() when debugInfo is not JSON-encodable', () {
+      // The map ostensibly types as Map<String, String> but the value
+      // is a custom non-encodable object cast in via dynamic. The
+      // logger must not crash — we want the original message visible
+      // plus a hint about the encoding failure.
+      final notEncodable = const _DebugInfo({
+        'good': 'fine',
+        'bad': '<unencodable>',
+      });
+      final logger = PrintLogger();
+      // Sanity-check: encoding the cleanup map directly succeeds —
+      // we exercise the real failure path by passing a self-cycle.
+      final cyclic = <String, dynamic>{};
+      cyclic['self'] = cyclic;
+      final cyclicInfo = _CyclicDebugInfo(cyclic);
+
+      final output = _capture(
+        () =>
+            logger.log(level: LogLevel.error, message: 'msg', info: cyclicInfo),
+      );
+      expect(output, hasLength(1));
+      expect(output.single, contains('msg'));
+      expect(output.single, contains('json encoding failed'));
+
+      // Sanity: a normal info still uses JSON encoding.
+      final ok = _capture(
+        () => logger.log(
+          level: LogLevel.error,
+          message: 'ok',
+          info: notEncodable,
+        ),
+      );
+      expect(ok.single, contains('"good":"fine"'));
+    });
   });
+}
+
+class _CyclicDebugInfo implements LoggerDebugInfo {
+  final Map<String, dynamic> _raw;
+  const _CyclicDebugInfo(this._raw);
+
+  // [LoggerDebugInfo.debugInfo] is typed as `Map<String, String>` —
+  // we deliberately violate that contract via a dynamic-cast view to
+  // exercise the encoder's failure path.
+  @override
+  Map<String, String> get debugInfo => _raw.cast<String, String>();
 }

@@ -114,8 +114,6 @@ void main() {
         // stopped container and explode; a sealed container silently
         // ignores.
         toggleStore.set(true);
-        // No assertion besides "didn't throw" — a leaked subscription
-        // would go via `toggle` into a stopped container.
       },
     );
   });

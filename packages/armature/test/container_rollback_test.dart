@@ -148,13 +148,13 @@ Future<void> main() async {
       });
 
       test(
-        'failed start disposes services built before the failing factory',
+        'failed start disposes stores built before the failing factory',
         () async {
           _DisposeCounter? disposeCounter;
           final healthy = createFeature(
             name: "healthy",
             stores: (_) {
-              // Construct the service INSIDE the factory so
+              // Construct the store INSIDE the factory so
               // `Store.track` picks it up and the orchestrator-layer
               // teardown can dispose it.
               disposeCounter = _DisposeCounter();
@@ -184,7 +184,7 @@ Future<void> main() async {
             disposeCounter?.disposeCount,
             equals(1),
             reason:
-                'services built before the failing factory must be '
+                'stores built before the failing factory must be '
                 'disposed by the rollback path',
           );
         },
@@ -195,9 +195,9 @@ Future<void> main() async {
         () async {
           var useBadFactory = true;
           final feature = createFeature<void, void, void>(
-            name: "badServices",
+            name: "badStores",
             stores: (_) {
-              if (useBadFactory) throw Exception('services factory failed');
+              if (useBadFactory) throw Exception('stores factory failed');
             },
             exports: (api) => api.own,
           );
@@ -240,7 +240,7 @@ Future<void> main() async {
       });
 
       test(
-        'services factory throw aborts start() fail-fast (no partial container)',
+        'stores factory throw aborts start() fail-fast (no partial container)',
         () async {
           final feature = createFeature(
             name: "badFactory",

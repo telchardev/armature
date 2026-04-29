@@ -6,7 +6,7 @@ import 'package:flutter/widgets.dart'
     show Widget, StatefulWidget, BuildContext, SizedBox, Text, State;
 
 import '../contexts/feature_context.dart' show FeatureContext;
-import '../services/safe_set_state_mixin.dart' show SafeSetStateMixin;
+import '../stores/safe_set_state_mixin.dart' show SafeSetStateMixin;
 import './slot_descriptor.dart' show SlotDescriptor;
 
 /// Builder that returns the loader widget shown while the hosting

@@ -32,7 +32,25 @@ class PrintLogger implements Logger {
 
     final prefix = '[${level.name.toUpperCase()}]';
     if (info != null) {
-      print('$prefix $message => ${_jsonEncoder.convert(info.debugInfo)}');
+      // [JsonEncoder.convert] throws on cyclic graphs or objects
+      // without a toJson hook. A logger throwing while reporting
+      // another error would mask the original problem and crash the
+      // framework's internal call sites — fall back to `toString()`
+      // (and even that wrapped in its own try/catch) so logging stays
+      // infallible.
+      String body;
+      try {
+        body = _jsonEncoder.convert(info.debugInfo);
+      } on Object catch (e) {
+        String repr;
+        try {
+          repr = info.debugInfo.toString();
+        } on Object {
+          repr = '<unprintable debug info>';
+        }
+        body = '$repr (json encoding failed: $e)';
+      }
+      print('$prefix $message => $body');
     } else {
       print('$prefix $message');
     }
